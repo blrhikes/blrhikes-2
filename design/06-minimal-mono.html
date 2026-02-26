@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design 6: Minimal Mono - BLR Hikes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            sans: ['Inter', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    .card-hover:hover .card-image { transform: scale(1.02); }
+  </style>
+</head>
+<body class="bg-white dark:bg-black text-black dark:text-white font-sans min-h-screen transition-colors">
+
+  <!-- Nav -->
+  <nav class="border-b border-black/10 dark:border-white/10">
+    <div class="max-w-6xl mx-auto px-6 flex items-center justify-between h-14">
+      <a href="index.html" class="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 font-mono">&larr; designs</a>
+      <span class="font-mono text-sm font-bold tracking-widest uppercase">BLR HIKES</span>
+      <div class="flex items-center gap-6">
+        <div class="hidden md:flex gap-6 text-xs font-mono uppercase tracking-wider text-black/40 dark:text-white/40">
+          <a href="#" class="text-black dark:text-white">Trails</a>
+          <a href="#" class="hover:text-black/70 dark:hover:text-white/70">Community</a>
+          <a href="#" class="hover:text-black/70 dark:hover:text-white/70">Events</a>
+        </div>
+        <button onclick="document.documentElement.classList.toggle('dark')" class="w-8 h-8 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center text-xs hover:bg-black/5 dark:hover:bg-white/5 transition">
+          <span class="dark:hidden">D</span>
+          <span class="hidden dark:inline">L</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto px-6 py-12">
+    <!-- Header -->
+    <div class="mb-12">
+      <h1 class="font-mono text-3xl font-bold tracking-tight mb-1">TRAILS</h1>
+      <p class="text-black/40 dark:text-white/40 text-sm font-mono">32 routes &middot; Bangalore region</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-10 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex flex-wrap gap-1.5">
+        <button class="font-mono text-xs tracking-wider uppercase bg-black dark:bg-white text-white dark:text-black px-3 py-1.5 rounded">ALL</button>
+        <button class="font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30 transition">EASY</button>
+        <button class="font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30 transition">MOD</button>
+        <button class="font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30 transition">HARD</button>
+      </div>
+      <div class="flex gap-1.5">
+        <button id="btn-grid" onclick="setView('grid')" class="font-mono text-xs tracking-wider uppercase bg-black dark:bg-white text-white dark:text-black px-3 py-1.5 rounded">GRID</button>
+        <button id="btn-list" onclick="setView('list')" class="font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40">LIST</button>
+        <button id="btn-table" onclick="setView('table')" class="font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40">TABLE</button>
+      </div>
+    </div>
+
+    <!-- Trail Grid -->
+    <div id="view-grid" class="grid gap-px sm:grid-cols-2 lg:grid-cols-3 bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
+
+      <!-- Card 1 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Kolar</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Anthargange Cave Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>5.2km</span>
+            <span>+320m</span>
+            <span>2-3h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">volcanic boulder caves and underground passages</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">cave</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">kid-friendly</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 2 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Tumkur</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Makalidurga Lake Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>8.4km</span>
+            <span>+450m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">old railway tracks to hilltop fort overlooking a hidden lake</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 3 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Chikkaballapur</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MOD-HARD</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Skandagiri Night Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>9.6km</span>
+            <span>+650m</span>
+            <span>4-5h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">pre-dawn climb rewarded with sunrise above the clouds</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 4 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Ramanagara</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">HARD</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Savandurga Monolith</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>6.0km</span>
+            <span>+580m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">one of asia's largest monoliths, exposed rock scrambles</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">scramble</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 5 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Ramanagara</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY-MOD</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Ramadevara Betta</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>4.8km</span>
+            <span>+200m</span>
+            <span>2h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">gentle forest walk to vulture sanctuary and hilltop temple</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">pet-friendly</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">forest</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- Card 6 -->
+      <a href="#" class="card-hover bg-white dark:bg-black p-0 block group">
+        <div class="overflow-hidden">
+          <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&h=400&fit=crop" alt="Trail" class="card-image w-full h-48 object-cover transition-transform duration-500 grayscale-[30%] group-hover:grayscale-0" />
+        </div>
+        <div class="p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Mandya</span>
+            <span class="font-mono text-[10px] tracking-widest uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span>
+          </div>
+          <h3 class="font-semibold text-lg leading-tight mb-2">Kunti Betta Sunrise</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4">
+            <span>7.2km</span>
+            <span>+380m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">twin hills by a serene lake, camping and sunrise</p>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">camping</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- List View -->
+    <div id="view-list" class="hidden border border-black/5 dark:border-white/5">
+
+      <!-- List Card 1 -->
+      <a href="#" class="bg-white dark:bg-black flex group border-b border-black/5 dark:border-white/5">
+        <img src="https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Kolar</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY</span>
+          </div>
+          <h3 class="font-semibold text-lg">Anthargange Cave Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>5.2km</span>
+            <span>+320m</span>
+            <span>2-3h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">volcanic boulder caves and underground passages</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">cave</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">kid-friendly</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- List Card 2 -->
+      <a href="#" class="bg-white dark:bg-black flex group border-b border-black/5 dark:border-white/5">
+        <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Tumkur</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span>
+          </div>
+          <h3 class="font-semibold text-lg">Makalidurga Lake Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>8.4km</span>
+            <span>+450m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">old railway tracks to hilltop fort overlooking a hidden lake</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- List Card 3 -->
+      <a href="#" class="bg-white dark:bg-black flex group border-b border-black/5 dark:border-white/5">
+        <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Chikkaballapur</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MOD-HARD</span>
+          </div>
+          <h3 class="font-semibold text-lg">Skandagiri Night Trek</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>9.6km</span>
+            <span>+650m</span>
+            <span>4-5h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">pre-dawn climb rewarded with sunrise above the clouds</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- List Card 4 -->
+      <a href="#" class="bg-white dark:bg-black flex group border-b border-black/5 dark:border-white/5">
+        <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Ramanagara</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">HARD</span>
+          </div>
+          <h3 class="font-semibold text-lg">Savandurga Monolith</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>6.0km</span>
+            <span>+580m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">one of asia's largest monoliths, exposed rock scrambles</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">scramble</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- List Card 5 -->
+      <a href="#" class="bg-white dark:bg-black flex group border-b border-black/5 dark:border-white/5">
+        <img src="https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Ramanagara</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY-MOD</span>
+          </div>
+          <h3 class="font-semibold text-lg">Ramadevara Betta</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>4.8km</span>
+            <span>+200m</span>
+            <span>2h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">gentle forest walk to vulture sanctuary and hilltop temple</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">pet-friendly</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">forest</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+          </div>
+        </div>
+      </a>
+
+      <!-- List Card 6 -->
+      <a href="#" class="bg-white dark:bg-black flex group">
+        <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=300&h=200&fit=crop" alt="Trail" class="w-40 h-28 flex-shrink-0 object-cover grayscale-[30%] group-hover:grayscale-0 transition-all duration-500" />
+        <div class="p-5 flex-1 min-w-0">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30">Mandya</span>
+            <span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span>
+          </div>
+          <h3 class="font-semibold text-lg">Kunti Betta Sunrise</h3>
+          <div class="font-mono text-xs text-black/30 dark:text-white/30 flex gap-4 mt-1">
+            <span>7.2km</span>
+            <span>+380m</span>
+            <span>3-4h</span>
+          </div>
+          <p class="text-xs text-black/30 dark:text-white/30 mt-1 line-clamp-1">twin hills by a serene lake, camping and sunrise</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+            <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">camping</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Table View -->
+    <div id="view-table" class="hidden overflow-x-auto border border-black/5 dark:border-white/5">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="font-mono text-[10px] tracking-widest uppercase text-black/30 dark:text-white/30 border-b border-black/10 dark:border-white/10">
+            <th class="text-left px-4 py-3 font-normal">TRAIL</th>
+            <th class="text-left px-4 py-3 font-normal">AREA</th>
+            <th class="text-left px-4 py-3 font-normal">DIFF</th>
+            <th class="text-left px-4 py-3 font-normal">DIST</th>
+            <th class="text-left px-4 py-3 font-normal">ELEV</th>
+            <th class="text-left px-4 py-3 font-normal">TIME</th>
+            <th class="text-left px-4 py-3 font-normal">TAGS</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Anthargange Cave Trek</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">volcanic boulder caves and underground passages</span>
+            </td>
+            <td class="px-4 py-3">Kolar</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY</span></td>
+            <td class="px-4 py-3">5.2km</td>
+            <td class="px-4 py-3">+320m</td>
+            <td class="px-4 py-3">2-3h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">cave</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">kid-friendly</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Makalidurga Lake Trek</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">old railway tracks to hilltop fort overlooking a hidden lake</span>
+            </td>
+            <td class="px-4 py-3">Tumkur</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span></td>
+            <td class="px-4 py-3">8.4km</td>
+            <td class="px-4 py-3">+450m</td>
+            <td class="px-4 py-3">3-4h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Skandagiri Night Trek</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">pre-dawn climb rewarded with sunrise above the clouds</span>
+            </td>
+            <td class="px-4 py-3">Chikkaballapur</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MOD-HARD</span></td>
+            <td class="px-4 py-3">9.6km</td>
+            <td class="px-4 py-3">+650m</td>
+            <td class="px-4 py-3">4-5h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Savandurga Monolith</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">one of asia's largest monoliths, exposed rock scrambles</span>
+            </td>
+            <td class="px-4 py-3">Ramanagara</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">HARD</span></td>
+            <td class="px-4 py-3">6.0km</td>
+            <td class="px-4 py-3">+580m</td>
+            <td class="px-4 py-3">3-4h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">scramble</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">hilltop</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Ramadevara Betta</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">gentle forest walk to vulture sanctuary and hilltop temple</span>
+            </td>
+            <td class="px-4 py-3">Ramanagara</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">EASY-MOD</span></td>
+            <td class="px-4 py-3">4.8km</td>
+            <td class="px-4 py-3">+200m</td>
+            <td class="px-4 py-3">2h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">pet-friendly</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">forest</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-black/5 dark:border-white/5 hover:bg-black/2 dark:hover:bg-white/2 transition">
+            <td class="px-4 py-3">
+              <span class="font-semibold">Kunti Betta Sunrise</span>
+              <br><span class="font-mono text-[10px] text-black/30 dark:text-white/30">twin hills by a serene lake, camping and sunrise</span>
+            </td>
+            <td class="px-4 py-3">Mandya</td>
+            <td class="px-4 py-3"><span class="font-mono text-[10px] uppercase border border-black/10 dark:border-white/10 px-2 py-0.5 rounded">MODERATE</span></td>
+            <td class="px-4 py-3">7.2km</td>
+            <td class="px-4 py-3">+380m</td>
+            <td class="px-4 py-3">3-4h</td>
+            <td class="px-4 py-3">
+              <div class="flex flex-wrap gap-1">
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">lake</span>
+                <span class="font-mono text-[10px] bg-black/3 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/50 dark:text-white/50">camping</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-12 pt-6 border-t border-black/5 dark:border-white/5">
+      <p class="font-mono text-[10px] tracking-widest uppercase text-black/20 dark:text-white/20">BLR HIKES &middot; 2025 &middot; BANGALORE</p>
+    </div>
+  </main>
+
+  <script>
+    function setView(mode) {
+      const views = ['grid', 'list', 'table'];
+      const activeClass = 'font-mono text-xs tracking-wider uppercase bg-black dark:bg-white text-white dark:text-black px-3 py-1.5 rounded';
+      const inactiveClass = 'font-mono text-xs tracking-wider uppercase border border-black/10 dark:border-white/10 px-3 py-1.5 rounded text-black/40 dark:text-white/40';
+
+      views.forEach(function(v) {
+        var viewEl = document.getElementById('view-' + v);
+        var btnEl = document.getElementById('btn-' + v);
+        if (v === mode) {
+          viewEl.classList.remove('hidden');
+          btnEl.className = activeClass;
+        } else {
+          viewEl.classList.add('hidden');
+          btnEl.className = inactiveClass;
+        }
+      });
+    }
+  </script>
+</body>
+</html>

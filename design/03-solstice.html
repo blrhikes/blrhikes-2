@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Design 3: Solstice - BLR Hikes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            light: { primary: '#626F47', secondary: '#A4B465', accent: '#FFCF50', background: '#FEFAE0' },
+            dark: { primary: '#69247C', secondary: '#DA498D', accent: '#FAC67A', background: '#1A1625' },
+          },
+          fontFamily: {
+            cormorant: ['"Cormorant Garamond"', 'serif'],
+            lora: ['Lora', 'serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    .grain-texture::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 50;
+    }
+  </style>
+</head>
+<body class="grain-texture font-lora bg-light-background text-light-primary dark:bg-dark-background dark:text-white min-h-screen transition-colors duration-300">
+
+  <!-- Nav -->
+  <nav class="px-6 md:px-12 py-5 flex items-center justify-between">
+    <a href="index.html" class="text-sm opacity-60 hover:opacity-100">&larr; All Designs</a>
+    <span class="font-cormorant text-3xl font-semibold tracking-wide">BLR Hikes</span>
+    <div class="flex items-center gap-6">
+      <div class="hidden md:flex gap-8 font-cormorant text-lg">
+        <a href="#" class="text-light-secondary dark:text-dark-accent font-semibold">Trails</a>
+        <a href="#" class="opacity-70 hover:opacity-100">About</a>
+        <a href="#" class="opacity-70 hover:opacity-100">Activities</a>
+      </div>
+      <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/30 transition" title="Toggle dark mode">
+        <span class="dark:hidden">🌙</span>
+        <span class="hidden dark:inline">☀️</span>
+      </button>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto px-6 md:px-16 py-12">
+    <!-- Header -->
+    <div class="mb-12">
+      <span class="block w-12 h-0.5 bg-light-accent dark:bg-dark-accent mb-4"></span>
+      <h1 class="font-cormorant text-5xl font-semibold mb-3">Trails</h1>
+      <p class="opacity-70 text-lg max-w-xl">Contemplative paths through the landscapes surrounding Bangalore. Each trail a dialogue with the land.</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-8 flex flex-wrap gap-2">
+      <button class="px-4 py-2 bg-light-primary dark:bg-dark-primary text-white rounded-md text-sm font-medium">All</button>
+      <button class="px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 transition">Accessible</button>
+      <button class="px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 transition">Moderate</button>
+      <button class="px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 transition">Challenging</button>
+    </div>
+
+    <!-- View Toggle -->
+    <div class="mb-6 flex gap-2">
+      <button id="btn-grid" onclick="setView('grid')" class="px-4 py-2 bg-light-primary dark:bg-dark-primary text-white rounded-md text-sm font-medium transition">Grid</button>
+      <button id="btn-list" onclick="setView('list')" class="px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium transition">List</button>
+      <button id="btn-table" onclick="setView('table')" class="px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium transition">Table</button>
+    </div>
+
+    <!-- Trail Grid -->
+    <div id="view-grid" class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+
+      <!-- Card 1 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Accessible</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Anthargange Cave Trek</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>5.2 km</span>
+            <span>↑ 320m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">An underground labyrinth of volcanic boulders, where darkness gives way to quiet revelation.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Cave</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Hilltop</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-primary/10 dark:bg-dark-primary/20">Kid-friendly</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Kolar</span>
+            <span>2-3 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Moderate</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Makalidurga Lake Trek</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>8.4 km</span>
+            <span>↑ 450m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">A journey along ancient railway tracks to a hilltop fort, where a hidden lake reflects the sky.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Temple</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Tumkur</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Challenging</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Skandagiri Night Trek</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>9.6 km</span>
+            <span>↑ 650m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">Ascend through pre-dawn darkness to meet the sunrise above clouds, a communion with the celestial.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Temple</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Chikkaballapur</span>
+            <span>4-5 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Challenging</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Savandurga Monolith</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>6.0 km</span>
+            <span>↑ 580m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">Asia's largest monolith, an ancient granite sentinal demanding both strength and reverence from those who climb.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Scramble</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Hilltop</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Ramanagara</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 5 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Accessible</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Ramadevara Betta</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>4.8 km</span>
+            <span>↑ 200m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">A gentle hill dotted with vulture nesting sites and ancient shrines, where the mundane meets the sacred.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Pet-friendly</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Forest</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-primary/10 dark:bg-dark-primary/20">Temple</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Ramanagara</span>
+            <span>2 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 6 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg overflow-hidden hover:-translate-y-1 transition-all duration-300">
+        <div class="h-40 relative">
+          <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=600&h=400&fit=crop" alt="Trail" class="w-full h-full object-cover" />
+          <span class="absolute top-3 right-3 bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Moderate</span>
+        </div>
+        <div class="p-6 flex flex-col flex-grow">
+          <h3 class="font-cormorant text-2xl font-semibold mb-2">Kunti Betta Sunrise</h3>
+          <div class="flex gap-3 text-sm opacity-80 mb-3">
+            <span>7.2 km</span>
+            <span>↑ 380m</span>
+          </div>
+          <p class="text-sm flex-grow opacity-70 mb-4">Twin hills flanking a serene lake, where mythology and landscape intertwine beneath the morning light.</p>
+          <div class="flex flex-wrap gap-1.5 mb-4">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-accent/20 dark:bg-dark-accent/20">Camping</span>
+          </div>
+          <div class="flex justify-between text-xs opacity-60 pt-3 border-t border-light-primary/10 dark:border-dark-accent/10">
+            <span>Mandya</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Trail List -->
+    <div id="view-list" class="hidden space-y-4">
+
+      <!-- List Card 1 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Anthargange Cave Trek</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Accessible</span>
+          </div>
+          <p class="text-sm opacity-70">An underground labyrinth of volcanic boulders</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Cave</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Kid-friendly</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Kolar</span>
+            <span>5.2 km</span>
+            <span>↑ 320m</span>
+            <span>2-3 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Card 2 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Makalidurga Lake Trek</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Moderate</span>
+          </div>
+          <p class="text-sm opacity-70">A journey along ancient railway tracks to a hilltop fort</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Tumkur</span>
+            <span>8.4 km</span>
+            <span>↑ 450m</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Card 3 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1500534623283-312aade485b7?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Skandagiri Night Trek</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Challenging</span>
+          </div>
+          <p class="text-sm opacity-70">Ascend through pre-dawn darkness to meet the sunrise</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Chikkaballapur</span>
+            <span>9.6 km</span>
+            <span>↑ 650m</span>
+            <span>4-5 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Card 4 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Savandurga Monolith</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Challenging</span>
+          </div>
+          <p class="text-sm opacity-70">Asia's largest monolith demanding strength and reverence</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Scramble</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Ramanagara</span>
+            <span>6.0 km</span>
+            <span>↑ 580m</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Card 5 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1510797215324-95aa89f43c33?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Ramadevara Betta</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Accessible</span>
+          </div>
+          <p class="text-sm opacity-70">A gentle hill with vulture nesting sites and ancient shrines</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Pet-friendly</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Forest</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Ramanagara</span>
+            <span>4.8 km</span>
+            <span>↑ 200m</span>
+            <span>2 hours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- List Card 6 -->
+      <div class="bg-white/80 dark:bg-dark-primary/40 rounded-lg hover:-translate-y-0.5 transition-all duration-300 flex overflow-hidden">
+        <img src="https://images.unsplash.com/photo-1519681393784-d120267933ba?w=300&h=200&fit=crop" alt="Trail" class="h-24 w-36 rounded-lg object-cover" />
+        <div class="flex-1 p-4 flex flex-col gap-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-cormorant text-xl font-semibold">Kunti Betta Sunrise</h3>
+            <span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-0.5 rounded">Moderate</span>
+          </div>
+          <p class="text-sm opacity-70">Twin hills flanking a serene lake beneath morning light</p>
+          <div class="flex flex-wrap gap-1.5">
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+            <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Camping</span>
+          </div>
+          <div class="flex gap-4 text-xs opacity-60">
+            <span>Mandya</span>
+            <span>7.2 km</span>
+            <span>↑ 380m</span>
+            <span>3-4 hours</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Trail Table -->
+    <div id="view-table" class="hidden overflow-x-auto">
+      <table class="w-full text-sm font-lora">
+        <thead>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10">
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Trail</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Area</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Difficulty</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Distance</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Elevation</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Time</th>
+            <th class="text-left py-3 px-4 text-xs uppercase tracking-wider opacity-50 font-cormorant">Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Anthargange Cave Trek</div>
+              <div class="text-xs opacity-60">An underground labyrinth of volcanic boulders, where darkness gives way to quiet revelation.</div>
+            </td>
+            <td class="py-4 px-4">Kolar</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Accessible</span></td>
+            <td class="py-4 px-4">5.2 km</td>
+            <td class="py-4 px-4">↑ 320m</td>
+            <td class="py-4 px-4">2-3 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Cave</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Kid-friendly</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Makalidurga Lake Trek</div>
+              <div class="text-xs opacity-60">A journey along ancient railway tracks to a hilltop fort, where a hidden lake reflects the sky.</div>
+            </td>
+            <td class="py-4 px-4">Tumkur</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Moderate</span></td>
+            <td class="py-4 px-4">8.4 km</td>
+            <td class="py-4 px-4">↑ 450m</td>
+            <td class="py-4 px-4">3-4 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Skandagiri Night Trek</div>
+              <div class="text-xs opacity-60">Ascend through pre-dawn darkness to meet the sunrise above clouds, a communion with the celestial.</div>
+            </td>
+            <td class="py-4 px-4">Chikkaballapur</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Challenging</span></td>
+            <td class="py-4 px-4">9.6 km</td>
+            <td class="py-4 px-4">↑ 650m</td>
+            <td class="py-4 px-4">4-5 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Savandurga Monolith</div>
+              <div class="text-xs opacity-60">Asia's largest monolith, an ancient granite sentinel demanding both strength and reverence.</div>
+            </td>
+            <td class="py-4 px-4">Ramanagara</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Challenging</span></td>
+            <td class="py-4 px-4">6.0 km</td>
+            <td class="py-4 px-4">↑ 580m</td>
+            <td class="py-4 px-4">3-4 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Scramble</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Hilltop</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Ramadevara Betta</div>
+              <div class="text-xs opacity-60">A gentle hill dotted with vulture nesting sites and ancient shrines, where the mundane meets the sacred.</div>
+            </td>
+            <td class="py-4 px-4">Ramanagara</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Accessible</span></td>
+            <td class="py-4 px-4">4.8 km</td>
+            <td class="py-4 px-4">↑ 200m</td>
+            <td class="py-4 px-4">2 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Pet-friendly</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Forest</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Temple</span>
+              </div>
+            </td>
+          </tr>
+          <tr class="border-b border-light-primary/10 dark:border-dark-accent/10 hover:bg-light-primary/5 dark:hover:bg-dark-primary/20 transition">
+            <td class="py-4 px-4">
+              <div class="font-cormorant text-lg font-semibold">Kunti Betta Sunrise</div>
+              <div class="text-xs opacity-60">Twin hills flanking a serene lake, where mythology and landscape intertwine beneath the morning light.</div>
+            </td>
+            <td class="py-4 px-4">Mandya</td>
+            <td class="py-4 px-4"><span class="bg-light-primary/90 dark:bg-dark-primary/90 text-white dark:text-dark-accent text-xs px-2 py-1 rounded font-medium">Moderate</span></td>
+            <td class="py-4 px-4">7.2 km</td>
+            <td class="py-4 px-4">↑ 380m</td>
+            <td class="py-4 px-4">3-4 hours</td>
+            <td class="py-4 px-4">
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Lake</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-light-secondary/20 dark:bg-dark-secondary/20">Camping</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-light-primary/10 dark:border-dark-accent/10 mt-16 py-8 text-center">
+    <p class="font-cormorant text-lg opacity-50 italic">In reciprocity with Land, Waters, Seasons</p>
+  </footer>
+
+  <script>
+    function setView(mode) {
+      const views = ['grid', 'list', 'table'];
+      const activeClass = 'px-4 py-2 bg-light-primary dark:bg-dark-primary text-white rounded-md text-sm font-medium transition';
+      const inactiveClass = 'px-4 py-2 border border-light-primary/30 dark:border-dark-accent/30 rounded-md text-sm font-medium transition';
+
+      views.forEach(function(v) {
+        document.getElementById('view-' + v).classList.toggle('hidden', v !== mode);
+        document.getElementById('btn-' + v).className = v === mode ? activeClass : inactiveClass;
+      });
+    }
+  </script>
+</body>
+</html>

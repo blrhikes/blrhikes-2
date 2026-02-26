@@ -1,0 +1,14 @@
+{
+  "name": "blrhikes-2",
+  "private": true,
+  "scripts": {
+    "dev:cms": "pnpm --filter @blrhikes/cms dev",
+    "dev:fe": "pnpm --filter @blrhikes/frontend dev",
+    "build:cms": "pnpm --filter @blrhikes/cms build",
+    "build:fe": "pnpm --filter @blrhikes/frontend build",
+    "migrate": "pnpm --filter @blrhikes/scripts migrate"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

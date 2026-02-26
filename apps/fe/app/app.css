@@ -1,0 +1,43 @@
+@import "tailwindcss" source(".");
+
+@font-face {
+  font-family: "Tiempos";
+  src: url("/fonts/tiempos-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Tiempos";
+  src: url("/fonts/tiempos-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@theme {
+  --font-serif: "Tiempos", Georgia, "Times New Roman", Times, serif;
+
+  --color-stone-50: #fafaf9;
+  --color-stone-100: #f5f5f4;
+  --color-stone-200: #e7e5e4;
+  --color-stone-300: #d6d3d1;
+  --color-stone-400: #a8a29e;
+  --color-stone-500: #78716c;
+  --color-stone-600: #57534e;
+  --color-stone-700: #44403c;
+  --color-stone-800: #292524;
+  --color-stone-900: #1c1917;
+
+  --color-accent: #eab308;
+  --color-accent-hover: #ca8a04;
+  --color-accent-light: #fef9c3;
+}
+
+html,
+body {
+  font-family: var(--font-serif);
+  background: var(--color-stone-50);
+  color: var(--color-stone-900);
+}

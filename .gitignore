@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+.turbo/
+.env
+.env.*
+!.env.example
+.wrangler/
+.dev.vars
+*.log
+.DS_Store
+.open-next/
+
+# Payload generated
+apps/cms/src/payload-types.ts
+apps/cms/src/app/(payload)/importMap.js
