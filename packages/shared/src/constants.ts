@@ -78,3 +78,7 @@ export const DIFFICULTY_ORDER: Record<Difficulty, number> = {
   "moderate-hard": 4,
   hard: 5,
 };
+
+export const ROLE_OPTIONS = ["admin", "contributor", "lifetime", "yearly"] as const;
+
+export type UserRole = (typeof ROLE_OPTIONS)[number];

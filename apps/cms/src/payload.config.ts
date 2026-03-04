@@ -13,6 +13,7 @@ import { Media } from './collections/Media'
 import { Areas } from './collections/Areas'
 import { Highlights } from './collections/Highlights'
 import { Trails } from './collections/Trails'
+import { GpxFiles } from './collections/GpxFiles'
 import { migrations } from './migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -48,13 +49,16 @@ const cloudflare =
     : await getCloudflareContext({ async: true })
 
 export default buildConfig({
+  serverURL: process.env.PAYLOAD_SERVER_URL || 'http://localhost:3000',
+  cors: ['https://beta.blrhikes.com', 'http://localhost:5173'],
+  csrf: ['https://beta.blrhikes.com', 'http://localhost:5173'],
   admin: {
     user: Users.slug,
     importMap: {
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, Areas, Highlights, Trails],
+  collections: [Users, Media, GpxFiles, Areas, Highlights, Trails],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
@@ -67,7 +71,7 @@ export default buildConfig({
   plugins: [
     r2Storage({
       bucket: cloudflare.env.R2,
-      collections: { media: true },
+      collections: { media: true, 'gpx-files': true },
     }),
   ],
 })

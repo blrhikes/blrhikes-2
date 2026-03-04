@@ -1,20 +1,10 @@
-import { useSearchParams, Form, Link } from "react-router";
+import { Form, Link } from "react-router";
 import type { Route } from "./+types/trails";
 import { fetchTrails } from "../lib/api.server";
-import {
-  DIFFICULTY_OPTIONS,
-  HIGHLIGHT_OPTIONS,
-  ACCESS_OPTIONS,
-  AREA_OPTIONS,
-} from "@blrhikes/shared";
-import type {
-  Difficulty,
-  Highlight,
-  Access,
-  Area,
-  TrailListParams,
-} from "@blrhikes/shared";
+import { DIFFICULTY_OPTIONS, HIGHLIGHT_OPTIONS, ACCESS_OPTIONS, AREA_OPTIONS } from "@blrhikes/shared";
+import type { Difficulty, Highlight, Access, Area, TrailListParams, AuthUser } from "@blrhikes/shared";
 import { TrailCard } from "../components/trail-card";
+import { BottomNav } from "../components/bottom-nav";
 import { useState } from "react";
 
 export function meta() {
@@ -27,7 +17,7 @@ export function meta() {
   ];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const params: TrailListParams = {
     search: url.searchParams.get("search") || undefined,
@@ -37,13 +27,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     hikingDuration: url.searchParams.get("duration") || undefined,
     area: url.searchParams.getAll("area") as Area[],
     sort: url.searchParams.get("sort") || undefined,
-    page: url.searchParams.get("page")
-      ? Number(url.searchParams.get("page"))
-      : undefined,
+    page: url.searchParams.get("page") ? Number(url.searchParams.get("page")) : undefined,
   };
 
-  const data = await fetchTrails(params);
-  return { trails: data.docs, totalDocs: data.totalDocs, params };
+  const data = await fetchTrails(params, context.payloadToken ?? undefined);
+  return { trails: data.docs, totalDocs: data.totalDocs, params, user: context.user };
 }
 
 function CheckboxGroup({
@@ -123,10 +111,7 @@ function RadioGroup({
             <span className="text-stone-700">Any</span>
           </label>
           {options.map((option) => (
-            <label
-              key={option.value}
-              className="flex items-center gap-2 text-sm"
-            >
+            <label key={option.value} className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
                 name={name}
@@ -144,30 +129,50 @@ function RadioGroup({
 }
 
 export default function TrailsPage({ loaderData }: Route.ComponentProps) {
-  const { trails, totalDocs, params } = loaderData;
-  const [searchParams] = useSearchParams();
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "table">("grid");
+  const { trails, totalDocs, params, user } = loaderData;
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-stone-50">
+    <div className="min-h-screen bg-stone-50 pb-20 sm:pb-0">
       {/* Nav */}
       <nav className="border-b border-stone-200">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-16">
           <Link to="/trails" className="text-2xl font-bold tracking-tight text-stone-900">
             BLRHikes
           </Link>
-          <div className="flex gap-8 text-sm">
+          <div className="hidden sm:flex items-center gap-8 text-sm">
             <span className="font-semibold text-accent">Trails</span>
-            <a href="#" className="text-stone-500 hover:text-stone-900 transition">Community</a>
-            <a href="#" className="text-stone-500 hover:text-stone-900 transition">Events</a>
+            <a href="#" className="text-stone-500 hover:text-stone-900 transition">
+              Community
+            </a>
+            <a href="#" className="text-stone-500 hover:text-stone-900 transition">
+              Events
+            </a>
+            {user ? (
+              <Form method="post" action="/logout">
+                <button type="submit" className="text-stone-500 hover:text-stone-900 transition">
+                  Log out
+                </button>
+              </Form>
+            ) : (
+              <Link to="/login" className="text-stone-500 hover:text-stone-900 transition">
+                Log in
+              </Link>
+            )}
           </div>
         </div>
       </nav>
 
       <main className="mx-auto max-w-6xl px-6 py-10">
-        <h1 className="text-4xl font-bold mb-1">Trails</h1>
-        <p className="text-stone-500 mb-8">Curated hikes within reach of Bangalore</p>
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-4xl font-bold mb-1">Trails</h1>
+            <p className="text-stone-500">Curated hikes near Bangalore</p>
+          </div>
+          <p className="text-sm text-stone-500">
+            {totalDocs} trail{totalDocs !== 1 ? "s" : ""} found
+          </p>
+        </div>
 
         <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-8">
           {/* Mobile filter toggle */}
@@ -183,10 +188,7 @@ export default function TrailsPage({ loaderData }: Route.ComponentProps) {
             <Form method="get" className="space-y-4 rounded-2xl border-2 border-stone-200 bg-stone-100 p-5">
               {/* Search */}
               <div>
-                <label
-                  htmlFor="search"
-                  className="block text-sm font-medium text-stone-900"
-                >
+                <label htmlFor="search" className="block text-sm font-medium text-stone-900">
                   Search
                 </label>
                 <input
@@ -211,18 +213,8 @@ export default function TrailsPage({ loaderData }: Route.ComponentProps) {
                 options={HIGHLIGHT_OPTIONS}
                 selected={params.highlights || []}
               />
-              <CheckboxGroup
-                name="access"
-                label="Access"
-                options={ACCESS_OPTIONS}
-                selected={params.access || []}
-              />
-              <CheckboxGroup
-                name="area"
-                label="Area"
-                options={AREA_OPTIONS}
-                selected={params.area || []}
-              />
+              <CheckboxGroup name="access" label="Access" options={ACCESS_OPTIONS} selected={params.access || []} />
+              <CheckboxGroup name="area" label="Area" options={AREA_OPTIONS} selected={params.area || []} />
               <RadioGroup
                 name="duration"
                 label="Hiking Duration"
@@ -236,10 +228,7 @@ export default function TrailsPage({ loaderData }: Route.ComponentProps) {
 
               {/* Sort */}
               <div>
-                <label
-                  htmlFor="sort"
-                  className="block text-sm font-medium text-stone-900"
-                >
+                <label htmlFor="sort" className="block text-sm font-medium text-stone-900">
                   Sort by
                 </label>
                 <select
@@ -269,148 +258,22 @@ export default function TrailsPage({ loaderData }: Route.ComponentProps) {
 
           {/* Main content */}
           <div>
-            {/* Results bar */}
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-sm text-stone-500">
-                {totalDocs} trail{totalDocs !== 1 ? "s" : ""} found
-              </p>
-              <div className="flex gap-1">
-                {(["grid", "list", "table"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    className={`rounded-lg px-3 py-1 text-sm transition ${
-                      viewMode === mode
-                        ? "bg-accent font-semibold text-stone-900"
-                        : "border-2 border-stone-200 bg-stone-100 text-stone-500 hover:border-accent"
-                    }`}
-                  >
-                    {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Trails */}
             {trails.length === 0 ? (
               <div className="rounded-2xl border-2 border-stone-200 bg-stone-100 p-12 text-center">
-                <p className="text-stone-500">
-                  No trails match your filters. Try adjusting your search.
-                </p>
+                <p className="text-stone-500">No trails match your filters. Try adjusting your search.</p>
               </div>
-            ) : viewMode === "grid" ? (
-              <div className="grid gap-6 grid-cols-2">
+            ) : (
+              <div className="grid gap-6 grid-cols-1 sm:grid-cols-2">
                 {trails.map((trail: any) => (
                   <TrailCard key={trail.id} trail={trail} mode="grid" />
                 ))}
               </div>
-            ) : viewMode === "list" ? (
-              <div className="space-y-3">
-                {trails.map((trail: any) => (
-                  <TrailCard key={trail.id} trail={trail} mode="list" />
-                ))}
-              </div>
-            ) : (
-              <TrailTable trails={trails} />
             )}
           </div>
         </div>
       </main>
+      <BottomNav />
     </div>
   );
 }
 
-function formatMinutes(minutes: number | undefined): string {
-  if (!minutes) return "—";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
-const difficultyBadge: Record<string, string> = {
-  easy: "border-2 border-stone-200 text-accent",
-  "easy-moderate": "border-2 border-stone-200 text-accent",
-  moderate: "bg-accent text-stone-50",
-  "moderate-hard": "border-2 border-accent bg-accent/10 text-accent",
-  hard: "bg-stone-200 text-stone-700",
-};
-
-function DifficultyBadge({ difficulty }: { difficulty: string }) {
-  const cls = difficultyBadge[difficulty] || "bg-stone-200 text-stone-700";
-  return (
-    <span className={`inline-block rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${cls}`}>
-      {difficulty}
-    </span>
-  );
-}
-
-function TrailTable({ trails }: { trails: any[] }) {
-  return (
-    <div className="overflow-x-auto rounded-2xl border-2 border-stone-200">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-stone-100 text-xs uppercase tracking-wider text-stone-500">
-            <th className="text-left px-4 py-3 border-b border-stone-200">Trail</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Area</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Difficulty</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Distance</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Elevation</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Time</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Drive</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Rating</th>
-            <th className="text-left px-4 py-3 border-b border-stone-200">Tags</th>
-          </tr>
-        </thead>
-        <tbody>
-          {trails.map((trail: any) => {
-            const imageUrl =
-              trail.coverImage && typeof trail.coverImage !== "string"
-                ? trail.coverImage.url
-                : undefined;
-            return (
-              <tr key={trail.id} className="border-b border-stone-200 hover:bg-accent/5 transition">
-                <td className="px-4 py-3">
-                  <Link to={`/trails/${trail.slug}`} className="hover:text-accent transition">
-                    <div className="flex items-center gap-3">
-                      {imageUrl && (
-                        <img
-                          src={imageUrl}
-                          alt={trail.title}
-                          className="h-10 w-14 rounded object-cover flex-shrink-0"
-                          loading="lazy"
-                        />
-                      )}
-                      <span className="font-bold font-serif">{trail.title}</span>
-                    </div>
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-stone-500">{trail.area || "—"}</td>
-                <td className="px-4 py-3">
-                  {trail.difficulty && <DifficultyBadge difficulty={trail.difficulty} />}
-                </td>
-                <td className="px-4 py-3">{trail.length != null ? `${trail.length} km` : "—"}</td>
-                <td className="px-4 py-3">{trail.elevationGain != null ? `${trail.elevationGain}m` : "—"}</td>
-                <td className="px-4 py-3">{formatMinutes(trail.hikingTime)}</td>
-                <td className="px-4 py-3">{trail.drivingDistanceText || "—"}</td>
-                <td className="px-4 py-3 text-accent font-semibold">
-                  {trail.rating != null ? `★ ${trail.rating}` : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {trail.highlights?.slice(0, 3).map((h: string) => (
-                      <span key={h} className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs">
-                        {h}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}

@@ -2,11 +2,13 @@
   "name": "blrhikes-2",
   "private": true,
   "scripts": {
-    "dev:cms": "pnpm --filter @blrhikes/cms dev",
+    "dev:cms": "pnpm --filter cms dev",
     "dev:fe": "pnpm --filter @blrhikes/frontend dev",
-    "build:cms": "pnpm --filter @blrhikes/cms build",
+    "build:cms": "pnpm --filter cms build",
     "build:fe": "pnpm --filter @blrhikes/frontend build",
-    "migrate": "pnpm --filter @blrhikes/scripts migrate"
+    "migrate": "pnpm --filter cms payload migrate",
+    "seed": "pnpm --filter @blrhikes/scripts seed",
+    "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx"
   },
   "engines": {
     "node": ">=22"

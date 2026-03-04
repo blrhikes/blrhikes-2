@@ -1,41 +1,65 @@
-import { Link, data } from "react-router";
+import { Form, Link, data } from "react-router";
 import type { Route } from "./+types/trail-detail";
 import { fetchTrailBySlug } from "../lib/api.server";
+import type { AuthUser } from "@blrhikes/shared";
 import Markdown from "react-markdown";
+import rehypeExternalLinks from "rehype-external-links";
+import { BottomNav } from "../components/bottom-nav";
 
-export function meta({ data: trail }: Route.MetaArgs) {
+function heroImageUrl(url: string): string {
+  return url.replace(/width=\d+/, "width=1920");
+}
+
+export function meta({ data: loaderData }: Route.MetaArgs) {
+  const trail = loaderData?.trail;
   if (!trail) {
     return [{ title: "Trail Not Found | BLR Hikes" }];
   }
   const title = `${trail.title} | BLR Hikes`;
-  const description = trail.area
-    ? `Hiking trail in ${trail.area} near Bangalore`
-    : "Hiking trail near Bangalore";
+  const description = trail.area ? `Hiking trail in ${trail.area} near Bangalore` : "Hiking trail near Bangalore";
   return [
     { title },
     { name: "description", content: description },
     { property: "og:title", content: title },
     { property: "og:description", content: description },
-    ...(trail.coverImage?.url
-      ? [{ property: "og:image", content: trail.coverImage.url }]
-      : []),
+    ...(trail.coverImageUrl ? [{ property: "og:image", content: trail.coverImageUrl }] : []),
   ];
 }
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const trail = await fetchTrailBySlug(params.slug);
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const trail = await fetchTrailBySlug(params.slug, context.payloadToken ?? undefined);
   if (!trail) {
     throw data(null, { status: 404 });
   }
-  return trail;
+  return { trail, user: context.user, cmsUrl: context.cmsUrl };
 }
 
-const difficultyBadge: Record<string, string> = {
-  easy: "border-2 border-stone-200 text-accent",
-  "easy-moderate": "border-2 border-stone-200 text-accent",
-  moderate: "bg-accent text-stone-50",
-  "moderate-hard": "border-2 border-accent bg-accent/10 text-accent",
-  hard: "bg-stone-200 text-stone-700",
+const accessLevels: Record<string, { icon: string; text: string; subtitle: string }> = {
+  PERMIT_REQUIRED: {
+    icon: "🎟️",
+    text: "Permit Required",
+    subtitle: "Buy permit via Aranya Vihaara",
+  },
+  OPEN_ACCESS: {
+    icon: "✅",
+    text: "Open Access",
+    subtitle: "No permit required",
+  },
+  TRACKED_ACCESS: {
+    icon: "📋",
+    text: "Tracked Access",
+    subtitle: "Officials will note your ID at the trailhead",
+  },
+  RESTRICTED: {
+    icon: "🚫",
+    text: "Restricted",
+    subtitle: "You won't be able to get a permit to hike here",
+  },
+  UNMONITORED: {
+    icon: "",
+    text: "Unmonitored",
+    subtitle: "No official monitoring. Hike at your own risk.",
+  },
 };
 
 function formatMinutes(minutes: number | undefined): string {
@@ -47,194 +71,220 @@ function formatMinutes(minutes: number | undefined): string {
   return `${h}h ${m}m`;
 }
 
-function StatItem({ label, value }: { label: string; value: string }) {
+function Stat({
+  value,
+  unit,
+  label,
+  size = "md",
+  extraClass = "",
+}: {
+  value: string;
+  unit?: string;
+  label: string;
+  size?: "xs" | "sm" | "md" | "lg";
+  extraClass?: string;
+}) {
+  const sizeClasses = {
+    xs: "text-sm md:text-base",
+    sm: "text-base md:text-lg",
+    md: "text-xl md:text-2xl",
+    lg: "text-2xl md:text-3xl",
+  };
+
   return (
-    <div className="rounded-2xl border-2 border-stone-200 bg-stone-100 p-4">
-      <dt className="text-xs font-medium uppercase tracking-wide text-stone-500">
-        {label}
-      </dt>
-      <dd className="mt-1 text-lg font-bold text-stone-900">{value}</dd>
+    <div className={`flex flex-col ${extraClass}`}>
+      <span className={`font-semibold ${sizeClasses[size]}`}>
+        {value}
+        {unit && <span className="ml-0.5 text-sm font-normal text-stone-500">{unit}</span>}
+      </span>
+      <span className="text-xs text-stone-500 md:text-sm">{label}</span>
     </div>
   );
 }
 
-export default function TrailDetailPage({
-  loaderData: trail,
-}: Route.ComponentProps) {
-  const imageUrl =
-    trail.coverImage && typeof trail.coverImage !== "string"
-      ? trail.coverImage.url
-      : undefined;
+function Tag({ text }: { text: string }) {
+  return (
+    <span className="inline-block rounded-full border border-stone-300 px-3 py-1 text-xs capitalize md:text-sm">
+      {text}
+    </span>
+  );
+}
 
-  const badgeClass =
-    difficultyBadge[trail.difficulty as string] || "bg-stone-200 text-stone-700";
+export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
+  const { trail, user, cmsUrl } = loaderData;
+  const imageUrl = trail.coverImageUrl ? heroImageUrl(trail.coverImageUrl as string) : undefined;
+  const access = trail.access as string | undefined;
+  const accessInfo = access ? accessLevels[access] : undefined;
+  const highlights = trail.highlights as string[] | undefined;
+  const canEdit = user && (user.role === "admin" || user.role === "contributor");
+  const cmsAdminUrl = `${cmsUrl}/admin/collections/trails/${trail.id}`;
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* Nav */}
-      <nav className="border-b border-stone-200">
-        <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-16">
-          <Link to="/trails" className="text-2xl font-bold tracking-tight text-stone-900">
+    <div className="min-h-screen bg-stone-50 pb-20 sm:pb-0">
+      {/* Hero Section — full-bleed image with overlaid content */}
+      <section className="relative -mt-0 h-[70vh] lg:h-[95vh]">
+        {imageUrl ? (
+          <img src={imageUrl} alt={trail.title as string} className="h-full w-full object-cover object-top" />
+        ) : (
+          <div className="h-full w-full bg-stone-300" />
+        )}
+
+        {/* Top nav bar — full-width frosted glass */}
+        <div className="absolute top-0 z-10 flex w-full items-center justify-between bg-stone-900/60 backdrop-blur-md px-6 py-3 text-stone-50 shadow-lg lg:px-12">
+          <Link to="/" className="text-lg font-bold tracking-tight lg:text-2xl">
             BLRHikes
           </Link>
-          <div className="flex gap-8 text-sm">
-            <Link to="/trails" className="font-semibold text-accent">Trails</Link>
-            <a href="#" className="text-stone-500 hover:text-stone-900 transition">Community</a>
-            <a href="#" className="text-stone-500 hover:text-stone-900 transition">Events</a>
+          <nav className="hidden items-center gap-6 text-sm lg:flex">
+            <Link to="/trails" className="decoration-yellow-500 decoration-2 underline-offset-2 hover:underline">
+              Trails
+            </Link>
+            {user ? (
+              <Form method="post" action="/logout">
+                <button type="submit" className="decoration-yellow-500 decoration-2 underline-offset-2 hover:underline">
+                  Log out
+                </button>
+              </Form>
+            ) : (
+              <Link to="/login" className="decoration-yellow-500 decoration-2 underline-offset-2 hover:underline">
+                Log in
+              </Link>
+            )}
+          </nav>
+        </div>
+
+        {/* Bottom gradient + content overlay */}
+        <div className="absolute bottom-0 flex h-full w-full items-end bg-gradient-to-t from-black/70 via-black/15 to-transparent">
+          <div className="mx-auto flex w-full flex-col justify-end p-6 text-stone-50 lg:max-w-5xl lg:p-4 lg:px-0 lg:pb-12 xl:max-w-6xl 2xl:max-w-7xl">
+            {/* Bottom row: trail info */}
+            <div>
+              <Link
+                to="/trails"
+                className="mb-4 inline-block rounded-lg bg-black/50 px-3 py-1.5 text-sm transition hover:bg-black/70"
+              >
+                ← Back to Trails
+              </Link>
+              <h1 className="text-4xl font-bold text-white lg:text-5xl">{trail.title as string}</h1>
+              {trail.altName && <p className="mt-1 text-lg italic text-stone-300">{trail.altName as string}</p>}
+              <p className="mt-2 text-xl font-semibold text-white lg:text-3xl">{trail.area as string}</p>
+            </div>
           </div>
         </div>
-      </nav>
+      </section>
 
-      {/* Back link */}
-      <div className="mx-auto max-w-6xl px-6 pt-6">
-        <Link
-          to="/trails"
-          className="text-sm text-stone-500 hover:text-accent transition"
-        >
-          ← Back to trails
-        </Link>
-      </div>
-
-      {/* Hero image */}
-      {imageUrl && (
-        <div className="mx-auto max-w-6xl px-6 mt-6">
-          <div className="relative h-64 sm:h-80 lg:h-96 overflow-hidden rounded-2xl bg-stone-200">
-            <img
-              src={imageUrl}
-              alt={trail.title as string}
-              className="h-full w-full object-cover"
-            />
+      {/* Main content */}
+      <article className="prose prose-xl prose-stone mx-auto max-w-4xl px-6 pb-32 pt-6 lg:prose-xl xl:prose-2xl sm:px-12">
+        {/* Edit link for admins/contributors */}
+        {canEdit && (
+          <div className="not-prose mb-4">
+            <a
+              href={cmsAdminUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border-2 border-accent bg-accent-light px-3 py-1.5 text-sm font-medium text-stone-900 transition hover:bg-accent"
+            >
+              Edit Trail ✏️
+            </a>
           </div>
-        </div>
-      )}
+        )}
 
-      <main className="mx-auto max-w-4xl px-6 py-8">
-        {/* Title section */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-stone-900">
-            {trail.title as string}
-          </h1>
-          {trail.altName && (
-            <p className="mt-1 text-lg italic text-stone-500">
-              {trail.altName as string}
-            </p>
-          )}
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            {trail.area && (
-              <span className="text-sm text-stone-600">
-                {trail.area as string}
-              </span>
+        {/* Access + Difficulty + Rating + Tags row */}
+        <div className="not-prose flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
+          <div className="flex w-full flex-wrap items-center justify-between gap-4">
+            {accessInfo && (
+              <Stat
+                value={`${accessInfo.icon} ${accessInfo.text}`}
+                label={accessInfo.subtitle}
+                extraClass="capitalize"
+                size="sm"
+              />
             )}
             {trail.difficulty && (
-              <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${badgeClass}`}>
-                {trail.difficulty as string}
-              </span>
+              <Stat value={trail.difficulty as string} label="Difficulty" size="sm" extraClass="capitalize" />
             )}
-            {trail.rating != null && (
-              <span className="text-sm text-accent font-semibold">
-                ★ {trail.rating as number}
-              </span>
-            )}
-            {trail.access && (
-              <span className="inline-flex items-center rounded-full border-2 border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">
-                {(trail.access as string).replace(/_/g, " ")}
-              </span>
+            {trail.rating != null && <Stat value={`${trail.rating}/5`} label="Rating" />}
+            {highlights && highlights.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1">
+                {highlights.map((h) => (
+                  <Tag key={h} text={h} />
+                ))}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Stats grid */}
-        <dl className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {trail.length != null && (
-            <StatItem label="Distance" value={`${trail.length} km`} />
-          )}
-          {trail.elevationGain != null && (
-            <StatItem
-              label="Elevation Gain"
-              value={`${trail.elevationGain}m`}
-            />
-          )}
-          {trail.elevation != null && (
-            <StatItem label="Peak Elevation" value={`${trail.elevation}m`} />
-          )}
-          {trail.hikingTime != null && (
-            <StatItem
+        {/* Stats row */}
+        <div className="not-prose grid grid-cols-3 gap-2 border-b border-stone-200 py-4 md:flex md:items-center md:justify-between md:py-3">
+          {trail.length != null && <Stat value={String(trail.length)} unit="km" label="Total Length" />}
+          {trail.elevationGain != null && <Stat value={String(trail.elevationGain)} unit="m" label="Elevation Gain" />}
+          {(trail.hikingTime != null || trail.hikingTimeWithRests != null) && (
+            <Stat
+              value={
+                trail.hikingTime != null && trail.hikingTimeWithRests != null
+                  ? `${formatMinutes(trail.hikingTime as number)}-${formatMinutes(trail.hikingTimeWithRests as number)}`
+                  : formatMinutes((trail.hikingTime ?? trail.hikingTimeWithRests) as number)
+              }
               label="Hiking Time"
-              value={formatMinutes(trail.hikingTime as number)}
             />
           )}
-          {trail.hikingTimeWithRests != null && (
-            <StatItem
-              label="With Rests"
-              value={formatMinutes(trail.hikingTimeWithRests as number)}
-            />
+          {(trail.drivingTimeText || trail.drivingDistanceText) && (
+            <>
+              <div className="hidden md:mx-2 md:block md:h-12 md:border-l md:border-stone-200" />
+              <Stat
+                value={[trail.drivingTimeText, trail.drivingDistanceText ? `${trail.drivingDistanceText} away` : ""]
+                  .filter(Boolean)
+                  .join(" or ")}
+                size="xs"
+                label="Approx. driving time and distance"
+                extraClass="col-span-3 pt-4 md:pt-0 md:col-span-1"
+              />
+            </>
           )}
-          {trail.hikingTimeWithExploration != null && (
-            <StatItem
-              label="With Exploration"
-              value={formatMinutes(trail.hikingTimeWithExploration as number)}
-            />
-          )}
-          {trail.drivingDistanceText && (
-            <StatItem
-              label="Driving Distance"
-              value={trail.drivingDistanceText as string}
-            />
-          )}
-          {trail.drivingTimeText && (
-            <StatItem
-              label="Driving Time"
-              value={trail.drivingTimeText as string}
-            />
-          )}
-        </dl>
+        </div>
 
-        {/* Highlights */}
-        {(trail.highlights as string[] | undefined)?.length ? (
-          <div className="mb-8">
-            <h2 className="mb-3 text-lg font-bold text-stone-900">
-              Highlights
-            </h2>
-            <div className="flex flex-wrap gap-2">
-              {(trail.highlights as string[]).map((h) => (
-                <span
-                  key={h}
-                  className="inline-flex items-center rounded-full border-2 border-accent/20 bg-accent-light px-3 py-1 text-sm font-medium text-stone-700"
-                >
-                  {h}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        {/* Action buttons — gated fields (gps, mapLink) only appear if CMS returned them */}
+        <div className="not-prose mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+          {trail.gps && (
+            <a
+              className="col-span-1 flex items-center justify-center rounded-lg bg-gradient-to-b from-stone-50 to-stone-200 px-4 pb-2 pt-3 text-center text-2xl font-semibold text-black shadow shadow-black/40 transition-all hover:from-yellow-50 hover:to-yellow-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 md:col-span-2"
+              href={`https://www.google.com/maps?q=${trail.gps}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Trailhead Location 📍
+            </a>
+          )}
+          {trail.mapLink && (
+            <a
+              className="flex flex-col justify-center rounded-lg bg-gradient-to-b from-stone-50 to-stone-200 px-4 pb-2 pt-3 text-center text-2xl font-semibold text-black shadow shadow-black/40 transition-all hover:from-yellow-50 hover:to-yellow-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+              href={trail.mapLink as string}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <div>Trail Map 🔗</div>
+              <div className="text-sm font-normal">GaiaGPS Link</div>
+            </a>
+          )}
+        </div>
 
-        {/* Content */}
+        {/* Trail content (markdown) */}
         {trail.content && (
-          <div className="mb-8">
-            <div className="prose prose-stone max-w-none rounded-2xl border-2 border-stone-200 bg-stone-100 p-6">
-              <Markdown>{trail.content as string}</Markdown>
-            </div>
+          <div className="mt-8">
+            <Markdown rehypePlugins={[[rehypeExternalLinks, { target: "_blank", rel: ["noopener", "noreferrer"] }]]}>
+              {trail.content as string}
+            </Markdown>
           </div>
         )}
 
         {/* Photo gallery */}
         {(trail.photos as any[] | undefined)?.length ? (
-          <div className="mb-8">
-            <h2 className="mb-3 text-lg font-bold text-stone-900">
-              Photos
-            </h2>
+          <div className="not-prose mt-8">
+            <h2 className="mb-3 text-lg font-bold text-stone-900">Photos</h2>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               {(trail.photos as any[]).map((photo, i) => {
-                const photoUrl =
-                  photo.image && typeof photo.image !== "string"
-                    ? photo.image.url
-                    : undefined;
+                const photoUrl = photo.image && typeof photo.image !== "string" ? photo.image.url : undefined;
                 if (!photoUrl) return null;
                 return (
-                  <div
-                    key={photo.id || i}
-                    className="aspect-[4/3] overflow-hidden rounded-2xl border-2 border-stone-200 bg-stone-200"
-                  >
+                  <div key={photo.id || i} className="aspect-[4/3] overflow-hidden rounded-lg bg-stone-200">
                     <img
                       src={photoUrl}
                       alt={photo.image?.alt || `Photo ${i + 1}`}
@@ -247,7 +297,8 @@ export default function TrailDetailPage({
             </div>
           </div>
         ) : null}
-      </main>
+      </article>
+      <BottomNav />
     </div>
   );
 }

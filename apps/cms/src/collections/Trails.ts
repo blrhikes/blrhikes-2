@@ -1,6 +1,43 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { DIFFICULTY_OPTIONS, ACCESS_OPTIONS } from '@blrhikes/shared'
+
+/**
+ * Field-level read access for gated fields.
+ * Allows access if user:
+ * - is admin or contributor (always)
+ * - is lifetime member
+ * - is yearly member with valid (non-expired) membership
+ * - has purchased this specific trail
+ */
+const canReadGatedField: FieldAccess = ({ req, doc }) => {
+  const user = req.user
+  if (!user) return false
+
+  const role = user.role as string
+
+  // Admins and contributors always have access
+  if (role === 'admin' || role === 'contributor') return true
+
+  // Lifetime members always have access
+  if (role === 'lifetime') return true
+
+  // Yearly members: check expiry
+  if (role === 'yearly') {
+    const expiresAt = user.membershipExpiresAt as string | undefined
+    if (!expiresAt) return false
+    return new Date(expiresAt) > new Date()
+  }
+
+  // Check individual trail purchase
+  if (doc?.id && Array.isArray(user.trailPurchases)) {
+    return user.trailPurchases.some(
+      (t: any) => (typeof t === 'object' ? t.id : t) === doc.id,
+    )
+  }
+
+  return false
+}
 
 export const Trails: CollectionConfig = {
   slug: 'trails',
@@ -47,8 +84,38 @@ export const Trails: CollectionConfig = {
     // Media
     {
       name: 'coverImage',
-      type: 'upload',
-      relationTo: 'media',
+      type: 'group',
+      admin: {
+        description: 'Cover image — use a CDN URL or upload/select an image',
+      },
+      fields: [
+        {
+          name: 'type',
+          type: 'radio',
+          defaultValue: 'url',
+          options: [
+            { label: 'CDN URL', value: 'url' },
+            { label: 'Upload', value: 'upload' },
+          ],
+        },
+        {
+          name: 'url',
+          type: 'text',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'url',
+            description: 'External CDN URL for the cover image',
+          },
+        },
+        {
+          name: 'image',
+          type: 'upload',
+          relationTo: 'media',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'upload',
+            description: 'Upload or select an existing image',
+          },
+        },
+      ],
     },
     {
       name: 'photos',
@@ -76,6 +143,9 @@ export const Trails: CollectionConfig = {
     {
       name: 'gps',
       type: 'text',
+      access: {
+        read: canReadGatedField,
+      },
     },
     {
       name: 'relativeLocation',
@@ -185,12 +255,26 @@ export const Trails: CollectionConfig = {
       },
     },
 
-    // Gated
+    // Gated — only visible to authenticated users
     {
       name: 'mapLink',
       type: 'text',
+      access: {
+        read: canReadGatedField,
+      },
       admin: {
         description: 'Hidden from free users in frontend',
+      },
+    },
+    {
+      name: 'gpxFile',
+      type: 'upload',
+      relationTo: 'gpx-files',
+      access: {
+        read: canReadGatedField,
+      },
+      admin: {
+        description: 'GPX track file for this trail',
       },
     },
 

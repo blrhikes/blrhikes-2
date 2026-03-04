@@ -3,9 +3,6 @@ import { HIKING_DURATION_FILTERS } from "@blrhikes/shared";
 
 const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
 
-// Fields to exclude from public responses (gated fields)
-const GATED_FIELDS = ["mapLink", "gps"];
-
 interface PayloadResponse<T> {
   docs: T[];
   totalDocs: number;
@@ -42,10 +39,10 @@ function buildTrailsQuery(params: TrailListParams): URLSearchParams {
     });
   }
 
-  // Highlights filter
+  // Highlights filter (relationship field — query by related doc's name)
   if (params.highlights?.length) {
     params.highlights.forEach((h, i) => {
-      qs.set(`where[highlights][in][${i}]`, h);
+      qs.set(`where[highlights.name][in][${i}]`, h);
     });
   }
 
@@ -90,21 +87,32 @@ function buildTrailsQuery(params: TrailListParams): URLSearchParams {
   return qs;
 }
 
+function buildHeaders(payloadToken?: string): HeadersInit {
+  if (!payloadToken) return {};
+  return { Cookie: `payload-token=${payloadToken}` };
+}
+
 function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
   const cleaned = { ...doc };
 
-  // Strip gated fields
-  for (const field of GATED_FIELDS) {
-    delete cleaned[field];
-  }
-
-  // Prefix relative image URLs with CMS_URL
-  if (cleaned.coverImage && typeof cleaned.coverImage === "object") {
-    const img = cleaned.coverImage as Record<string, unknown>;
-    if (img.url && typeof img.url === "string" && img.url.startsWith("/")) {
-      img.url = `${CMS_URL}${img.url}`;
+  // Flatten coverImage group → coverImageUrl string
+  const coverImage = cleaned.coverImage as
+    | { type?: string; url?: string; image?: { url?: string } | string }
+    | undefined;
+  if (coverImage) {
+    if (coverImage.type === 'upload' && coverImage.image) {
+      const imgUrl =
+        typeof coverImage.image === 'string'
+          ? coverImage.image
+          : coverImage.image?.url;
+      if (imgUrl) {
+        cleaned.coverImageUrl = imgUrl.startsWith('/') ? `${CMS_URL}${imgUrl}` : imgUrl;
+      }
+    } else if (coverImage.url) {
+      cleaned.coverImageUrl = coverImage.url;
     }
   }
+
   if (Array.isArray(cleaned.photos)) {
     cleaned.photos = cleaned.photos.map((p: any) => {
       if (p?.image?.url && typeof p.image.url === "string" && p.image.url.startsWith("/")) {
@@ -129,11 +137,11 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
   return cleaned;
 }
 
-export async function fetchTrails(params: TrailListParams) {
+export async function fetchTrails(params: TrailListParams, payloadToken?: string) {
   const qs = buildTrailsQuery(params);
   const url = `${CMS_URL}/api/trails?${qs.toString()}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: buildHeaders(payloadToken) });
   if (!res.ok) {
     throw new Error(`CMS API error: ${res.status}`);
   }
@@ -146,7 +154,7 @@ export async function fetchTrails(params: TrailListParams) {
   };
 }
 
-export async function fetchTrailBySlug(slug: string) {
+export async function fetchTrailBySlug(slug: string, payloadToken?: string) {
   const qs = new URLSearchParams();
   qs.set("where[slug][equals]", slug);
   qs.set("where[status][equals]", "live");
@@ -154,7 +162,7 @@ export async function fetchTrailBySlug(slug: string) {
 
   const url = `${CMS_URL}/api/trails?${qs.toString()}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: buildHeaders(payloadToken) });
   if (!res.ok) {
     throw new Error(`CMS API error: ${res.status}`);
   }

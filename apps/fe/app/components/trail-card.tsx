@@ -1,10 +1,10 @@
 import { Link } from "react-router";
 
 const difficultyBadge: Record<string, string> = {
-  easy: "border-2 border-stone-200 text-accent",
-  "easy-moderate": "border-2 border-stone-200 text-accent",
-  moderate: "bg-accent text-stone-50",
-  "moderate-hard": "border-2 border-accent bg-accent/10 text-accent",
+  easy: "bg-stone-200 text-stone-700",
+  "easy-moderate": "bg-stone-200 text-stone-700",
+  moderate: "bg-stone-200 text-stone-700",
+  "moderate-hard": "bg-stone-200 text-stone-700",
   hard: "bg-stone-200 text-stone-700",
 };
 
@@ -18,9 +18,7 @@ function formatMinutes(minutes: number | undefined): string {
 }
 
 function getCoverImageUrl(trail: any): string | undefined {
-  if (!trail.coverImage) return undefined;
-  if (typeof trail.coverImage === "string") return undefined;
-  return trail.coverImage.url;
+  return trail.coverImageUrl || undefined;
 }
 
 export function TrailCard({
@@ -86,7 +84,7 @@ export function TrailCard({
         </div>
 
         {trail.rating != null && (
-          <span className="text-accent font-semibold text-sm flex-shrink-0">
+          <span className="text-stone-600 font-semibold text-sm flex-shrink-0">
             ★ {trail.rating}
           </span>
         )}
@@ -159,7 +157,7 @@ export function TrailCard({
             {trail.drivingDistanceText && ` · ${trail.drivingDistanceText}`}
           </span>
           {trail.rating != null && (
-            <span className="text-accent font-semibold">★ {trail.rating}</span>
+            <span className="text-stone-600 font-semibold">★ {trail.rating}</span>
           )}
         </div>
       </div>
