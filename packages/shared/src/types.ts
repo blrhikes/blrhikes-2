@@ -36,6 +36,10 @@ export interface Trail {
   hikingTimeWithRests?: number;
   hikingTimeWithExploration?: number;
 
+  // GPX / distance
+  gpxFile?: MediaItem;
+  distanceFromBangalore?: number; // straight-line km from Bangalore centre, auto-calculated
+
   // Gated
   mapLink?: string;
 

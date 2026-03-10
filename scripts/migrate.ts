@@ -9,8 +9,31 @@ import {
 // --- Configuration ---
 const GITHUB_REPO = "shreshthmohan/blrhikes-data";
 const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
-const CMS_API_KEY = process.env.CMS_API_KEY || "";
+const CMS_EMAIL = process.env.CMS_EMAIL || "";
+const CMS_PASSWORD = process.env.CMS_PASSWORD || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+
+// JWT token acquired after login — populated in main()
+let CMS_TOKEN = "";
+
+// --- Auth ---
+async function loginToCMS(): Promise<void> {
+  const res = await fetch(`${CMS_URL}/api/users/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: CMS_EMAIL, password: CMS_PASSWORD }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`CMS login failed: ${res.status} ${text}`);
+  }
+  const data = (await res.json()) as { token: string };
+  CMS_TOKEN = data.token;
+  console.log("Logged in to CMS successfully.");
+}
+
+const authHeaders = (): Record<string, string> =>
+  CMS_TOKEN ? { Authorization: `Bearer ${CMS_TOKEN}` } : {};
 
 // --- Types ---
 interface GitHubIssue {
@@ -217,9 +240,7 @@ async function uploadImage(
 
     const res = await fetch(`${CMS_URL}/api/media`, {
       method: "POST",
-      headers: {
-        ...(CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {}),
-      },
+      headers: authHeaders(),
       body: formData,
     });
 
@@ -240,8 +261,6 @@ async function uploadImage(
 const areaCache = new Map<string, string>();
 const highlightCache = new Map<string, string>();
 
-const authHeaders = (): Record<string, string> =>
-  CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {};
 
 async function getOrCreateArea(name: string): Promise<string> {
   if (areaCache.has(name)) return areaCache.get(name)!;
@@ -351,7 +370,7 @@ async function createTrail(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {}),
+      ...authHeaders(),
     },
     body: JSON.stringify(body),
   });
@@ -365,8 +384,9 @@ async function createTrail(
 // --- Main ---
 async function main() {
   console.log(`CMS_URL: ${CMS_URL}`);
-  console.log(`CMS_API_KEY: ${CMS_API_KEY ? CMS_API_KEY.slice(0, 8) + "..." : "(not set)"}`);
+  console.log(`CMS_EMAIL: ${CMS_EMAIL || "(not set)"}`);
   console.log(`GITHUB_TOKEN: ${GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 8) + "..." : "(not set)"}`);
+  await loginToCMS();
   console.log("Fetching issues from GitHub...");
   const issues = await fetchIssues();
   console.log(`Found ${issues.length} trail issues`);
@@ -380,9 +400,7 @@ async function main() {
       // Check if trail already exists
       const checkRes = await fetch(
         `${CMS_URL}/api/trails?where[githubIssueNumber][equals]=${issue.number}&limit=1`,
-        {
-          headers: CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {},
-        }
+        { headers: authHeaders() }
       );
       if (checkRes.ok) {
         const existing = (await checkRes.json()) as { totalDocs: number };
