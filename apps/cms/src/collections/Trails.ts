@@ -5,6 +5,7 @@ import {
   distanceFromBangaloreCenter,
   extractTrailheadFromGpx,
   parseGpsField,
+  parseGpxStats,
 } from '../lib/gpx'
 import { getDrivingInfoFromBangalore } from '../lib/driving'
 
@@ -274,6 +275,20 @@ export const Trails: CollectionConfig = {
                 : gpxUrl
               const gpxContent = await fetch(absUrl).then((r) => r.text())
               trailhead = extractTrailheadFromGpx(gpxContent)
+
+              // Parse hiking stats from GPX track
+              const stats = parseGpxStats(gpxContent)
+              if (stats) {
+                // Only overwrite if the field hasn't been manually set
+                if (!data.length) data.length = stats.length
+                if (!data.elevationGain) data.elevationGain = stats.elevationGain
+                if (!data.hikingTime) data.hikingTime = stats.hikingTime
+                if (!data.hikingTimeWithRests) data.hikingTimeWithRests = stats.hikingTimeWithRests
+                req.payload.logger.info(
+                  { stats },
+                  `GPX stats parsed: ${stats.length}km, +${stats.elevationGain}m, ~${stats.hikingTime}min`,
+                )
+              }
             }
           } catch (err) {
             req.payload.logger.error({ err }, 'Failed to parse GPX file')
