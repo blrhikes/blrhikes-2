@@ -1,3 +1,6 @@
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import matter from "gray-matter";
 import {
   DIFFICULTY_OPTIONS,
@@ -13,10 +16,8 @@ const CMS_EMAIL = process.env.CMS_EMAIL || "";
 const CMS_PASSWORD = process.env.CMS_PASSWORD || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 
-// JWT token acquired after login — populated in main()
 let CMS_TOKEN = "";
 
-// --- Auth ---
 async function loginToCMS(): Promise<void> {
   const res = await fetch(`${CMS_URL}/api/users/login`, {
     method: "POST",
@@ -31,9 +32,15 @@ async function loginToCMS(): Promise<void> {
   CMS_TOKEN = data.token;
   console.log("Logged in to CMS successfully.");
 }
+const FORCE = process.argv.includes("--force");
+const REFRESH = process.argv.includes("--refresh");
 
-const authHeaders = (): Record<string, string> =>
-  CMS_TOKEN ? { Authorization: `Bearer ${CMS_TOKEN}` } : {};
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CACHE_DIR = join(__dirname, ".cache");
+const CACHE_FILE = join(CACHE_DIR, "github-data.json");
+
+const CDN_BASE =
+  "https://blrhikes.com/cdn-cgi/image/width=800,quality=80,format=jpeg/https://images.blrhikes.com";
 
 // --- Types ---
 interface GitHubIssue {
@@ -41,6 +48,17 @@ interface GitHubIssue {
   title: string;
   body: string;
   labels: Array<{ name: string }>;
+}
+
+interface GitHubComment {
+  id: number;
+  body: string;
+}
+
+interface CachedGitHubData {
+  fetchedAt: string;
+  issues: GitHubIssue[];
+  comments: Record<number, GitHubComment[]>;
 }
 
 interface ParsedTrail {
@@ -70,6 +88,14 @@ interface ParsedTrail {
   content?: string;
   coverImageUrl?: string;
   status: "draft" | "live";
+}
+
+// --- URL Rewriting ---
+function rewriteGitHubImageUrls(markdown: string): string {
+  return markdown.replace(
+    /https:\/\/github\.com\/user-attachments\/assets\/([a-f0-9-]+)/g,
+    `${CDN_BASE}/$1`,
+  );
 }
 
 // --- Helpers ---
@@ -109,24 +135,29 @@ function parseNumber(value: unknown): number | undefined {
 function extractCoverImageUrl(body: string): string | undefined {
   // Match ![alt](url) pattern - typically the first image in the body
   const match = body.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
-  return match?.[1];
+  if (!match?.[1]) return undefined;
+  return rewriteGitHubImageUrls(match[1]);
 }
 
 // --- Fetch issues from GitHub ---
+function githubHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  };
+  if (GITHUB_TOKEN) {
+    headers.Authorization = `token ${GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
 async function fetchIssues(): Promise<GitHubIssue[]> {
   const allIssues: GitHubIssue[] = [];
   let page = 1;
 
   while (true) {
     const url = `https://api.github.com/repos/${GITHUB_REPO}/issues?labels=trail,status:live&state=all&per_page=100&page=${page}`;
-    const headers: Record<string, string> = {
-      Accept: "application/vnd.github.v3+json",
-    };
-    if (GITHUB_TOKEN) {
-      headers.Authorization = `token ${GITHUB_TOKEN}`;
-    }
 
-    const res = await fetch(url, { headers });
+    const res = await fetch(url, { headers: githubHeaders() });
     if (!res.ok) {
       throw new Error(`GitHub API error: ${res.status} ${await res.text()}`);
     }
@@ -139,6 +170,45 @@ async function fetchIssues(): Promise<GitHubIssue[]> {
   }
 
   return allIssues;
+}
+
+// --- Fetch issue comments ---
+async function fetchIssueComments(issueNumber: number): Promise<GitHubComment[]> {
+  const allComments: GitHubComment[] = [];
+  let page = 1;
+
+  while (true) {
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/issues/${issueNumber}/comments?per_page=100&page=${page}`;
+
+    const res = await fetch(url, { headers: githubHeaders() });
+    if (!res.ok) {
+      console.warn(`  Failed to fetch comments for issue #${issueNumber}: ${res.status}`);
+      break;
+    }
+
+    const comments = (await res.json()) as GitHubComment[];
+    if (comments.length === 0) break;
+
+    allComments.push(...comments);
+    page++;
+  }
+
+  return allComments;
+}
+
+// --- Parse live sections from comments ---
+function parseLiveSections(comments: GitHubComment[]): string {
+  const sections: string[] = [];
+
+  for (const comment of comments) {
+    const { data: frontmatter, content } = matter(comment.body || "");
+    if (frontmatter.section && frontmatter.status === "live") {
+      const rewrittenContent = rewriteGitHubImageUrls(content.trim());
+      sections.push(`## ${frontmatter.section}\n\n${rewrittenContent}`);
+    }
+  }
+
+  return sections.join("\n\n");
 }
 
 // --- Parse an issue into trail data ---
@@ -169,7 +239,7 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     rating: parseNumber(frontmatter.rating),
     length: parseNumber(frontmatter.length),
     elevationGain: parseNumber(
-      frontmatter.elevationGain ?? frontmatter.elevation_gain
+      frontmatter.elevationGain ?? frontmatter.elevation_gain,
     ),
     elevation: parseNumber(frontmatter.elevation),
     difficulty: normalizeDifficulty(frontmatter.difficulty),
@@ -177,90 +247,40 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     drivingDistance: parseNumber(
       frontmatter.drivingDistance ??
         frontmatter.computedDrivingDistance ??
-        frontmatter.driving_distance
+        frontmatter.driving_distance,
     ),
     drivingDistanceText:
       frontmatter.drivingDistanceText ?? frontmatter.driving_distance_text,
     drivingTime: parseNumber(
       frontmatter.drivingTime ??
         frontmatter.computedDrivingTime ??
-        frontmatter.driving_time
+        frontmatter.driving_time,
     ),
     drivingTimeText:
       frontmatter.drivingTimeText ?? frontmatter.driving_time_text,
     hikingTime: parseNumber(
-      frontmatter.hikingTime ?? frontmatter.hiking_time
+      frontmatter.hikingTime ?? frontmatter.hiking_time,
     ),
     hikingTimeWithRests: parseNumber(
-      frontmatter.hikingTimeWithRests ?? frontmatter.hiking_time_with_rests
+      frontmatter.hikingTimeWithRests ?? frontmatter.hiking_time_with_rests,
     ),
     hikingTimeWithExploration: parseNumber(
       frontmatter.hikingTimeWithExploration ??
-        frontmatter.hiking_time_with_exploration
+        frontmatter.hiking_time_with_exploration,
     ),
     mapLink: frontmatter.mapLink ?? frontmatter.map_link,
-    content: content.trim(),
+    content: rewriteGitHubImageUrls(content.trim()),
     coverImageUrl,
     status: "live",
   };
-}
-
-// --- Upload cover image to CMS ---
-async function uploadImage(
-  imageUrl: string,
-  alt: string
-): Promise<string | undefined> {
-  try {
-    // Fetch the image (GitHub user-attachment URLs may need auth)
-    const imgHeaders: Record<string, string> = {};
-    if (GITHUB_TOKEN && imageUrl.includes("github.com")) {
-      imgHeaders.Authorization = `token ${GITHUB_TOKEN}`;
-    }
-    const imgRes = await fetch(imageUrl, { headers: imgHeaders });
-    if (!imgRes.ok) {
-      console.warn(`  Failed to fetch image: ${imageUrl}`);
-      return undefined;
-    }
-
-    const blob = await imgRes.blob();
-    const contentType = blob.type || "image/jpeg";
-    const extMap: Record<string, string> = {
-      "image/jpeg": "jpg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-    };
-    const ext = extMap[contentType] || "jpg";
-    const filename = `${slugify(alt)}.${ext}`;
-
-    const file = new File([blob], filename, { type: contentType });
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("_payload", JSON.stringify({ alt: alt || filename }));
-
-    const res = await fetch(`${CMS_URL}/api/media`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: formData,
-    });
-
-    if (!res.ok) {
-      console.warn(`  Failed to upload image: ${res.status}`);
-      return undefined;
-    }
-
-    const data = (await res.json()) as { doc: { id: string } };
-    return data.doc.id;
-  } catch (err) {
-    console.warn(`  Image upload error: ${err}`);
-    return undefined;
-  }
 }
 
 // --- Caches for area/highlight IDs ---
 const areaCache = new Map<string, string>();
 const highlightCache = new Map<string, string>();
 
+const authHeaders = (): Record<string, string> =>
+  CMS_TOKEN ? { Authorization: `Bearer ${CMS_TOKEN}` } : {};
 
 async function getOrCreateArea(name: string): Promise<string> {
   if (areaCache.has(name)) return areaCache.get(name)!;
@@ -268,7 +288,7 @@ async function getOrCreateArea(name: string): Promise<string> {
   // Check if it exists
   const checkRes = await fetch(
     `${CMS_URL}/api/areas?where[name][equals]=${encodeURIComponent(name)}&limit=1`,
-    { headers: authHeaders() }
+    { headers: authHeaders() },
   );
   if (checkRes.ok) {
     const data = (await checkRes.json()) as { docs: { id: string }[]; totalDocs: number };
@@ -295,7 +315,7 @@ async function getOrCreateHighlight(name: string): Promise<string> {
 
   const checkRes = await fetch(
     `${CMS_URL}/api/highlights?where[name][equals]=${encodeURIComponent(name)}&limit=1`,
-    { headers: authHeaders() }
+    { headers: authHeaders() },
   );
   if (checkRes.ok) {
     const data = (await checkRes.json()) as { docs: { id: string }[]; totalDocs: number };
@@ -316,11 +336,8 @@ async function getOrCreateHighlight(name: string): Promise<string> {
   return doc.doc.id;
 }
 
-// --- Create trail in CMS ---
-async function createTrail(
-  trail: ParsedTrail,
-  coverImageId?: string
-): Promise<void> {
+// --- Create or update trail in CMS ---
+async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<void> {
   // Resolve area → ID
   const areaId = trail.area ? await getOrCreateArea(trail.area) : undefined;
 
@@ -354,20 +371,24 @@ async function createTrail(
     hikingTimeWithExploration: trail.hikingTimeWithExploration,
     mapLink: trail.mapLink,
     content: trail.content,
+    coverImage: trail.coverImageUrl
+      ? { type: 'url', url: trail.coverImageUrl }
+      : undefined,
     status: trail.status,
   };
-
-  if (coverImageId) {
-    body.coverImage = coverImageId;
-  }
 
   // Remove undefined values
   for (const key of Object.keys(body)) {
     if (body[key] === undefined) delete body[key];
   }
 
-  const res = await fetch(`${CMS_URL}/api/trails`, {
-    method: "POST",
+  const method = existingId ? "PATCH" : "POST";
+  const url = existingId
+    ? `${CMS_URL}/api/trails/${existingId}`
+    : `${CMS_URL}/api/trails`;
+
+  const res = await fetch(url, {
+    method,
     headers: {
       "Content-Type": "application/json",
       ...authHeaders(),
@@ -377,8 +398,60 @@ async function createTrail(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Failed to create trail "${trail.title}": ${res.status} ${text}`);
+    throw new Error(`Failed to ${method} trail "${trail.title}": ${res.status} ${text}`);
   }
+}
+
+// --- Local GitHub data cache ---
+function readCache(): CachedGitHubData | null {
+  if (!existsSync(CACHE_FILE)) return null;
+  try {
+    const raw = readFileSync(CACHE_FILE, "utf-8");
+    return JSON.parse(raw) as CachedGitHubData;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(data: CachedGitHubData): void {
+  mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
+}
+
+async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
+  if (!REFRESH) {
+    const cached = readCache();
+    if (cached) {
+      console.log(`Using cached GitHub data from ${cached.fetchedAt}`);
+      console.log(`  ${cached.issues.length} issues, ${Object.keys(cached.comments).length} comment threads`);
+      console.log(`  (use --refresh to re-fetch from GitHub)`);
+      return cached;
+    }
+  }
+
+  console.log("Fetching issues from GitHub...");
+  const issues = await fetchIssues();
+  console.log(`Found ${issues.length} trail issues`);
+
+  console.log("Fetching comments for each issue...");
+  const comments: Record<number, GitHubComment[]> = {};
+  for (const issue of issues) {
+    const issueComments = await fetchIssueComments(issue.number);
+    comments[issue.number] = issueComments;
+    if (issueComments.length > 0) {
+      console.log(`  #${issue.number}: ${issueComments.length} comment(s)`);
+    }
+  }
+
+  const data: CachedGitHubData = {
+    fetchedAt: new Date().toISOString(),
+    issues,
+    comments,
+  };
+
+  writeCache(data);
+  console.log(`Cached GitHub data to ${CACHE_FILE}`);
+  return data;
 }
 
 // --- Main ---
@@ -386,41 +459,52 @@ async function main() {
   console.log(`CMS_URL: ${CMS_URL}`);
   console.log(`CMS_EMAIL: ${CMS_EMAIL || "(not set)"}`);
   console.log(`GITHUB_TOKEN: ${GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 8) + "..." : "(not set)"}`);
+  console.log(`Force mode: ${FORCE ? "ON" : "OFF"}`);
   await loginToCMS();
-  console.log("Fetching issues from GitHub...");
-  const issues = await fetchIssues();
-  console.log(`Found ${issues.length} trail issues`);
+
+  const githubData = await loadOrFetchGitHubData();
 
   let success = 0;
   let failed = 0;
 
-  for (const issue of issues) {
+  for (const issue of githubData.issues) {
     console.log(`\nProcessing: ${issue.title} (#${issue.number})`);
     try {
       // Check if trail already exists
       const checkRes = await fetch(
         `${CMS_URL}/api/trails?where[githubIssueNumber][equals]=${issue.number}&limit=1`,
-        { headers: authHeaders() }
+        {
+          headers: authHeaders(),
+        },
       );
+      let existingId: string | undefined;
       if (checkRes.ok) {
-        const existing = (await checkRes.json()) as { totalDocs: number };
+        const existing = (await checkRes.json()) as { totalDocs: number; docs: { id: string }[] };
         if (existing.totalDocs > 0) {
-          console.log(`  Skipped (already exists)`);
-          success++;
-          continue;
+          if (!FORCE) {
+            console.log(`  Skipped (already exists, use --force to update)`);
+            success++;
+            continue;
+          }
+          existingId = existing.docs[0].id;
+          console.log(`  Updating existing trail (--force)...`);
         }
       }
 
       const trail = parseIssue(issue);
 
-      let coverImageId: string | undefined;
-      if (trail.coverImageUrl) {
-        console.log(`  Uploading cover image...`);
-        coverImageId = await uploadImage(trail.coverImageUrl, trail.title);
+      // Append live sections from cached comments
+      const comments = githubData.comments[issue.number] || [];
+      const liveSections = parseLiveSections(comments);
+      if (liveSections) {
+        trail.content = trail.content
+          ? `${trail.content}\n\n${liveSections}`
+          : liveSections;
+        console.log(`  Appended live sections from ${comments.length} comment(s)`);
       }
 
-      console.log(`  Creating trail in CMS...`);
-      await createTrail(trail, coverImageId);
+      console.log(`  ${existingId ? "Updating" : "Creating"} trail in CMS...`);
+      await upsertTrail(trail, existingId);
       console.log(`  Done.`);
       success++;
     } catch (err) {

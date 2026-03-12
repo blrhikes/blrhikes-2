@@ -11,6 +11,9 @@ dist/
 .DS_Store
 .open-next/
 
+# Script caches
+scripts/.cache/
+
 # Payload generated
 apps/cms/src/payload-types.ts
 apps/cms/src/app/(payload)/importMap.js

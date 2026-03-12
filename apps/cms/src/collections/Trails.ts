@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { DIFFICULTY_OPTIONS, ACCESS_OPTIONS } from '@blrhikes/shared'
 import {
@@ -8,6 +8,43 @@ import {
   parseGpxStats,
 } from '../lib/gpx'
 import { getDrivingInfoFromBangalore } from '../lib/driving'
+
+/**
+ * Field-level read access for gated fields.
+ * Allows access if user:
+ * - is admin or contributor (always)
+ * - is lifetime member
+ * - is yearly member with valid (non-expired) membership
+ * - has purchased this specific trail
+ */
+const canReadGatedField: FieldAccess = ({ req, doc }) => {
+  const user = req.user
+  if (!user) return false
+
+  const role = user.role as string
+
+  // Admins and contributors always have access
+  if (role === 'admin' || role === 'contributor') return true
+
+  // Lifetime members always have access
+  if (role === 'lifetime') return true
+
+  // Yearly members: check expiry
+  if (role === 'yearly') {
+    const expiresAt = user.membershipExpiresAt as string | undefined
+    if (!expiresAt) return false
+    return new Date(expiresAt) > new Date()
+  }
+
+  // Check individual trail purchase
+  if (doc?.id && Array.isArray(user.trailPurchases)) {
+    return user.trailPurchases.some(
+      (t: any) => (typeof t === 'object' ? t.id : t) === doc.id,
+    )
+  }
+
+  return false
+}
 
 export const Trails: CollectionConfig = {
   slug: 'trails',
@@ -54,8 +91,38 @@ export const Trails: CollectionConfig = {
     // Media
     {
       name: 'coverImage',
-      type: 'upload',
-      relationTo: 'media',
+      type: 'group',
+      admin: {
+        description: 'Cover image — use a CDN URL or upload/select an image',
+      },
+      fields: [
+        {
+          name: 'type',
+          type: 'radio',
+          defaultValue: 'url',
+          options: [
+            { label: 'CDN URL', value: 'url' },
+            { label: 'Upload', value: 'upload' },
+          ],
+        },
+        {
+          name: 'url',
+          type: 'text',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'url',
+            description: 'External CDN URL for the cover image',
+          },
+        },
+        {
+          name: 'image',
+          type: 'upload',
+          relationTo: 'media',
+          admin: {
+            condition: (_, siblingData) => siblingData?.type === 'upload',
+            description: 'Upload or select an existing image',
+          },
+        },
+      ],
     },
     {
       name: 'photos',
@@ -83,6 +150,9 @@ export const Trails: CollectionConfig = {
     {
       name: 'gps',
       type: 'text',
+      access: {
+        read: canReadGatedField,
+      },
       admin: {
         description: 'Trailhead GPS coordinates as "lat,lng" (e.g. 12.9716,77.5946)',
       },
@@ -92,17 +162,9 @@ export const Trails: CollectionConfig = {
       type: 'number',
       admin: {
         description:
-          'Straight-line distance from Bangalore centre to trailhead in km. Auto-calculated from GPX file or gps field — do not edit manually.',
+          'Straight-line distance from Bangalore centre (Cubbon Park) to trailhead in km. Auto-calculated — do not edit manually.',
         readOnly: true,
         position: 'sidebar',
-      },
-    },
-    {
-      name: 'gpxFile',
-      type: 'upload',
-      relationTo: 'media',
-      admin: {
-        description: 'GPX route file. Uploading this auto-calculates distanceFromBangalore.',
       },
     },
     {
@@ -213,12 +275,26 @@ export const Trails: CollectionConfig = {
       },
     },
 
-    // Gated
+    // Gated — only visible to authenticated users
     {
       name: 'mapLink',
       type: 'text',
+      access: {
+        read: canReadGatedField,
+      },
       admin: {
         description: 'Hidden from free users in frontend',
+      },
+    },
+    {
+      name: 'gpxFile',
+      type: 'upload',
+      relationTo: 'gpx-files',
+      access: {
+        read: canReadGatedField,
+      },
+      admin: {
+        description: 'GPX track file. Auto-calculates trail stats on upload.',
       },
     },
 
@@ -259,34 +335,32 @@ export const Trails: CollectionConfig = {
         const gpxChanged = gpxFileId && gpxFileId !== prevGpxFileId
         const gpsChanged = data.gps && data.gps !== originalDoc?.gps
 
-        // Resolve trailhead coords — priority: GPX file > gps text field
         let trailhead: { lat: number; lng: number } | null = null
 
         if (gpxChanged) {
           try {
             const media = await req.payload.findByID({
-              collection: 'media',
+              collection: 'gpx-files',
               id: gpxFileId,
             })
             const gpxUrl = (media as any).url as string | undefined
             if (gpxUrl) {
               const absUrl = gpxUrl.startsWith('/')
-                ? `${process.env.CMS_URL || 'http://localhost:3000'}${gpxUrl}`
+                ? `${process.env.PAYLOAD_SERVER_URL || 'http://localhost:3000'}${gpxUrl}`
                 : gpxUrl
               const gpxContent = await fetch(absUrl).then((r) => r.text())
               trailhead = extractTrailheadFromGpx(gpxContent)
 
-              // Parse hiking stats from GPX track
+              // Auto-fill hiking stats (only if not manually set)
               const stats = parseGpxStats(gpxContent)
               if (stats) {
-                // Only overwrite if the field hasn't been manually set
                 if (!data.length) data.length = stats.length
                 if (!data.elevationGain) data.elevationGain = stats.elevationGain
                 if (!data.hikingTime) data.hikingTime = stats.hikingTime
                 if (!data.hikingTimeWithRests) data.hikingTimeWithRests = stats.hikingTimeWithRests
                 req.payload.logger.info(
                   { stats },
-                  `GPX stats parsed: ${stats.length}km, +${stats.elevationGain}m, ~${stats.hikingTime}min`,
+                  `GPX stats: ${stats.length}km, +${stats.elevationGain}m, ~${stats.hikingTime}min`,
                 )
               }
             }
@@ -298,10 +372,8 @@ export const Trails: CollectionConfig = {
         }
 
         if (trailhead) {
-          // Straight-line distance (no API needed)
           data.distanceFromBangalore = distanceFromBangaloreCenter(trailhead)
 
-          // Driving distance + time via HERE Routing API
           try {
             const driving = await getDrivingInfoFromBangalore(trailhead)
             if (driving) {

@@ -1,4 +1,4 @@
-import type { Access, Area, Difficulty, Highlight } from "./constants.js";
+import type { Access, Area, Difficulty, Highlight, UserRole } from "./constants.js";
 
 export interface Trail {
   id: string;
@@ -56,6 +56,12 @@ export interface MediaItem {
   alt?: string;
   width?: number;
   height?: number;
+}
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  role: UserRole;
 }
 
 export interface TrailListParams {

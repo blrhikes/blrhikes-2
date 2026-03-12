@@ -12,16 +12,19 @@
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
+		"@blrhikes/shared": "workspace:*",
+		"gray-matter": "^4.0.3",
 		"isbot": "^5.1.31",
 		"react": "^19.1.1",
 		"react-dom": "^19.1.1",
-		"react-router": "^7.10.0",
 		"react-markdown": "^9.0.3",
-		"@blrhikes/shared": "workspace:*"
+		"react-router": "^7.10.0",
+		"rehype-external-links": "^3.0.0"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "^1.13.5",
 		"@react-router/dev": "^7.10.0",
+		"@tailwindcss/typography": "^0.5.16",
 		"@tailwindcss/vite": "^4.1.13",
 		"@types/node": "^22.19.9",
 		"@types/react": "^19.1.13",

@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "migrate": "tsx --env-file=.env migrate.ts"
+    "seed": "tsx --env-file=.env migrate.ts",
+    "seed:gpx": "tsx --env-file=.env migrate-gpx.ts"
   },
   "dependencies": {
     "@blrhikes/shared": "workspace:*",
