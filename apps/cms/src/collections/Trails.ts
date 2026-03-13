@@ -171,12 +171,6 @@ export const Trails: CollectionConfig = {
       name: 'relativeLocation',
       type: 'text',
     },
-    {
-      name: 'isLocal',
-      type: 'checkbox',
-      defaultValue: false,
-    },
-
     // Characteristics
     {
       name: 'highlights',

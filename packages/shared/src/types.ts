@@ -14,8 +14,6 @@ export interface Trail {
   area?: Area;
   gps?: string;
   relativeLocation?: string;
-  isLocal?: boolean;
-
   // Characteristics
   highlights?: Highlight[];
   rating?: number;

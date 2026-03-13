@@ -69,7 +69,7 @@ interface ParsedTrail {
   area?: string;
   gps?: string;
   relativeLocation?: string;
-  isLocal?: boolean;
+
   highlights?: string[];
   rating?: number;
   length?: number;
@@ -227,7 +227,7 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     area: frontmatter.area || "Unknown",
     gps: frontmatter.gps,
     relativeLocation: frontmatter.relativeLocation || frontmatter.relative_location,
-    isLocal: frontmatter.isLocal ?? frontmatter.is_local,
+
     highlights: Array.isArray(frontmatter.highlights)
       ? frontmatter.highlights.map((h: string) => h.toLowerCase().trim())
       : frontmatter.tags
@@ -354,7 +354,7 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     area: areaId,
     gps: trail.gps,
     relativeLocation: trail.relativeLocation,
-    isLocal: trail.isLocal,
+
     highlights: highlightIds,
     rating: trail.rating,
     length: trail.length,

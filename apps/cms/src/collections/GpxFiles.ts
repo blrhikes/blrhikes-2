@@ -15,6 +15,6 @@ export const GpxFiles: CollectionConfig = {
   upload: {
     crop: false,
     focalPoint: false,
-    mimeTypes: ['application/gpx+xml', 'application/xml', 'text/xml'],
+    mimeTypes: ['application/gpx+xml', 'application/xml', 'text/xml', 'application/octet-stream'],
   },
 }
