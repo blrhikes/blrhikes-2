@@ -7,6 +7,7 @@
     "build:cms": "pnpm --filter cms build",
     "build:fe": "pnpm --filter @blrhikes/frontend build",
     "migrate": "pnpm --filter cms payload migrate",
+    "migrate:create": "pnpm --filter cms payload migrate:create",
     "seed": "pnpm --filter @blrhikes/scripts seed",
     "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx"
   },

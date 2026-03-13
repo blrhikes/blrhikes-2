@@ -1,8 +1,6 @@
 import type { TrailListParams } from "@blrhikes/shared";
 import { HIKING_DURATION_FILTERS } from "@blrhikes/shared";
 
-const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
-
 interface PayloadResponse<T> {
   docs: T[];
   totalDocs: number;
@@ -92,7 +90,7 @@ function buildHeaders(payloadToken?: string): HeadersInit {
   return { Cookie: `payload-token=${payloadToken}` };
 }
 
-function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
+function normalizeTrail<T extends Record<string, unknown>>(doc: T, cmsUrl: string): T {
   const cleaned = { ...doc };
 
   // Flatten coverImage group → coverImageUrl string
@@ -106,7 +104,7 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
           ? coverImage.image
           : coverImage.image?.url;
       if (imgUrl) {
-        cleaned.coverImageUrl = imgUrl.startsWith('/') ? `${CMS_URL}${imgUrl}` : imgUrl;
+        cleaned.coverImageUrl = imgUrl.startsWith('/') ? `${cmsUrl}${imgUrl}` : imgUrl;
       }
     } else if (coverImage.url) {
       cleaned.coverImageUrl = coverImage.url;
@@ -116,7 +114,7 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
   if (Array.isArray(cleaned.photos)) {
     cleaned.photos = cleaned.photos.map((p: any) => {
       if (p?.image?.url && typeof p.image.url === "string" && p.image.url.startsWith("/")) {
-        return { ...p, image: { ...p.image, url: `${CMS_URL}${p.image.url}` } };
+        return { ...p, image: { ...p.image, url: `${cmsUrl}${p.image.url}` } };
       }
       return p;
     });
@@ -137,9 +135,9 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T): T {
   return cleaned;
 }
 
-export async function fetchTrails(params: TrailListParams, payloadToken?: string) {
+export async function fetchTrails(cmsUrl: string, params: TrailListParams, payloadToken?: string) {
   const qs = buildTrailsQuery(params);
-  const url = `${CMS_URL}/api/trails?${qs.toString()}`;
+  const url = `${cmsUrl}/api/trails?${qs.toString()}`;
 
   const res = await fetch(url, { headers: buildHeaders(payloadToken) });
   if (!res.ok) {
@@ -150,17 +148,17 @@ export async function fetchTrails(params: TrailListParams, payloadToken?: string
 
   return {
     ...data,
-    docs: data.docs.map(normalizeTrail),
+    docs: data.docs.map((doc) => normalizeTrail(doc, cmsUrl)),
   };
 }
 
-export async function fetchTrailBySlug(slug: string, payloadToken?: string) {
+export async function fetchTrailBySlug(cmsUrl: string, slug: string, payloadToken?: string) {
   const qs = new URLSearchParams();
   qs.set("where[slug][equals]", slug);
   qs.set("where[status][equals]", "live");
   qs.set("limit", "1");
 
-  const url = `${CMS_URL}/api/trails?${qs.toString()}`;
+  const url = `${cmsUrl}/api/trails?${qs.toString()}`;
 
   const res = await fetch(url, { headers: buildHeaders(payloadToken) });
   if (!res.ok) {
@@ -171,5 +169,5 @@ export async function fetchTrailBySlug(slug: string, payloadToken?: string) {
 
   if (data.docs.length === 0) return null;
 
-  return normalizeTrail(data.docs[0]);
+  return normalizeTrail(data.docs[0], cmsUrl);
 }

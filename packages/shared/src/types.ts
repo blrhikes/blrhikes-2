@@ -14,8 +14,6 @@ export interface Trail {
   area?: Area;
   gps?: string;
   relativeLocation?: string;
-  isLocal?: boolean;
-
   // Characteristics
   highlights?: Highlight[];
   rating?: number;
@@ -35,6 +33,10 @@ export interface Trail {
   hikingTime?: number;
   hikingTimeWithRests?: number;
   hikingTimeWithExploration?: number;
+
+  // GPX / distance
+  gpxFile?: MediaItem;
+  distanceFromBangalore?: number; // straight-line km from Bangalore centre, auto-calculated
 
   // Gated
   mapLink?: string;

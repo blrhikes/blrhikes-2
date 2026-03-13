@@ -27,7 +27,7 @@ export function meta({ data: loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
-  const trail = await fetchTrailBySlug(params.slug, context.payloadToken ?? undefined);
+  const trail = await fetchTrailBySlug(context.cmsUrl, params.slug, context.payloadToken ?? undefined);
   if (!trail) {
     throw data(null, { status: 404 });
   }

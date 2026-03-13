@@ -12,8 +12,26 @@ import {
 // --- Configuration ---
 const GITHUB_REPO = "shreshthmohan/blrhikes-data";
 const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
-const CMS_API_KEY = process.env.CMS_API_KEY || "";
+const CMS_EMAIL = process.env.CMS_EMAIL || "";
+const CMS_PASSWORD = process.env.CMS_PASSWORD || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+
+let CMS_TOKEN = "";
+
+async function loginToCMS(): Promise<void> {
+  const res = await fetch(`${CMS_URL}/api/users/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: CMS_EMAIL, password: CMS_PASSWORD }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`CMS login failed: ${res.status} ${text}`);
+  }
+  const data = (await res.json()) as { token: string };
+  CMS_TOKEN = data.token;
+  console.log("Logged in to CMS successfully.");
+}
 const FORCE = process.argv.includes("--force");
 const REFRESH = process.argv.includes("--refresh");
 
@@ -51,7 +69,7 @@ interface ParsedTrail {
   area?: string;
   gps?: string;
   relativeLocation?: string;
-  isLocal?: boolean;
+
   highlights?: string[];
   rating?: number;
   length?: number;
@@ -209,7 +227,7 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     area: frontmatter.area || "Unknown",
     gps: frontmatter.gps,
     relativeLocation: frontmatter.relativeLocation || frontmatter.relative_location,
-    isLocal: frontmatter.isLocal ?? frontmatter.is_local,
+
     highlights: Array.isArray(frontmatter.highlights)
       ? frontmatter.highlights.map((h: string) => h.toLowerCase().trim())
       : frontmatter.tags
@@ -262,7 +280,7 @@ const areaCache = new Map<string, string>();
 const highlightCache = new Map<string, string>();
 
 const authHeaders = (): Record<string, string> =>
-  CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {};
+  CMS_TOKEN ? { Authorization: `Bearer ${CMS_TOKEN}` } : {};
 
 async function getOrCreateArea(name: string): Promise<string> {
   if (areaCache.has(name)) return areaCache.get(name)!;
@@ -336,7 +354,7 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     area: areaId,
     gps: trail.gps,
     relativeLocation: trail.relativeLocation,
-    isLocal: trail.isLocal,
+
     highlights: highlightIds,
     rating: trail.rating,
     length: trail.length,
@@ -373,7 +391,7 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {}),
+      ...authHeaders(),
     },
     body: JSON.stringify(body),
   });
@@ -439,9 +457,10 @@ async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
 // --- Main ---
 async function main() {
   console.log(`CMS_URL: ${CMS_URL}`);
-  console.log(`CMS_API_KEY: ${CMS_API_KEY ? CMS_API_KEY.slice(0, 8) + "..." : "(not set)"}`);
+  console.log(`CMS_EMAIL: ${CMS_EMAIL || "(not set)"}`);
   console.log(`GITHUB_TOKEN: ${GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 8) + "..." : "(not set)"}`);
   console.log(`Force mode: ${FORCE ? "ON" : "OFF"}`);
+  await loginToCMS();
 
   const githubData = await loadOrFetchGitHubData();
 
@@ -455,7 +474,7 @@ async function main() {
       const checkRes = await fetch(
         `${CMS_URL}/api/trails?where[githubIssueNumber][equals]=${issue.number}&limit=1`,
         {
-          headers: CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {},
+          headers: authHeaders(),
         },
       );
       let existingId: string | undefined;

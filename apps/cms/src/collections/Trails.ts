@@ -1,6 +1,13 @@
 import type { CollectionConfig, FieldAccess } from 'payload'
 
 import { DIFFICULTY_OPTIONS, ACCESS_OPTIONS } from '@blrhikes/shared'
+import {
+  distanceFromBangaloreCenter,
+  extractTrailheadFromGpx,
+  parseGpsField,
+  parseGpxStats,
+} from '../lib/gpx'
+import { getDrivingInfoFromBangalore } from '../lib/driving'
 
 /**
  * Field-level read access for gated fields.
@@ -146,17 +153,24 @@ export const Trails: CollectionConfig = {
       access: {
         read: canReadGatedField,
       },
+      admin: {
+        description: 'Trailhead GPS coordinates as "lat,lng" (e.g. 12.9716,77.5946)',
+      },
+    },
+    {
+      name: 'distanceFromBangalore',
+      type: 'number',
+      admin: {
+        description:
+          'Straight-line distance from Bangalore centre (Cubbon Park) to trailhead in km. Auto-calculated — do not edit manually.',
+        readOnly: true,
+        position: 'sidebar',
+      },
     },
     {
       name: 'relativeLocation',
       type: 'text',
     },
-    {
-      name: 'isLocal',
-      type: 'checkbox',
-      defaultValue: false,
-    },
-
     // Characteristics
     {
       name: 'highlights',
@@ -274,7 +288,7 @@ export const Trails: CollectionConfig = {
         read: canReadGatedField,
       },
       admin: {
-        description: 'GPX track file for this trail',
+        description: 'GPX track file. Auto-calculates trail stats on upload.',
       },
     },
 
@@ -302,4 +316,73 @@ export const Trails: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    beforeChange: [
+      async ({ data, originalDoc, req }) => {
+        const gpxFileId =
+          typeof data.gpxFile === 'object' ? data.gpxFile?.id : data.gpxFile
+        const prevGpxFileId =
+          typeof originalDoc?.gpxFile === 'object'
+            ? originalDoc?.gpxFile?.id
+            : originalDoc?.gpxFile
+
+        const gpxChanged = gpxFileId && gpxFileId !== prevGpxFileId
+        const gpsChanged = data.gps && data.gps !== originalDoc?.gps
+
+        let trailhead: { lat: number; lng: number } | null = null
+
+        if (gpxChanged) {
+          try {
+            const media = await req.payload.findByID({
+              collection: 'gpx-files',
+              id: gpxFileId,
+            })
+            const gpxUrl = (media as any).url as string | undefined
+            if (gpxUrl) {
+              const absUrl = gpxUrl.startsWith('/')
+                ? `${process.env.PAYLOAD_SERVER_URL || 'http://localhost:3000'}${gpxUrl}`
+                : gpxUrl
+              const gpxContent = await fetch(absUrl).then((r) => r.text())
+              trailhead = extractTrailheadFromGpx(gpxContent)
+
+              // Auto-fill hiking stats (only if not manually set)
+              const stats = parseGpxStats(gpxContent)
+              if (stats) {
+                if (!data.length) data.length = stats.length
+                if (!data.elevationGain) data.elevationGain = stats.elevationGain
+                if (!data.hikingTime) data.hikingTime = stats.hikingTime
+                if (!data.hikingTimeWithRests) data.hikingTimeWithRests = stats.hikingTimeWithRests
+                req.payload.logger.info(
+                  { stats },
+                  `GPX stats: ${stats.length}km, +${stats.elevationGain}m, ~${stats.hikingTime}min`,
+                )
+              }
+            }
+          } catch (err) {
+            req.payload.logger.error({ err }, 'Failed to parse GPX file')
+          }
+        } else if (gpsChanged) {
+          trailhead = parseGpsField(data.gps)
+        }
+
+        if (trailhead) {
+          data.distanceFromBangalore = distanceFromBangaloreCenter(trailhead)
+
+          try {
+            const driving = await getDrivingInfoFromBangalore(trailhead)
+            if (driving) {
+              data.drivingDistance = driving.drivingDistance
+              data.drivingDistanceText = driving.drivingDistanceText
+              data.drivingTime = driving.drivingTime
+              data.drivingTimeText = driving.drivingTimeText
+            }
+          } catch (err) {
+            req.payload.logger.error({ err }, 'HERE Routing API call failed')
+          }
+        }
+
+        return data
+      },
+    ],
+  },
 }

@@ -11,7 +11,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  const cmsUrl = context.cloudflare.env.CMS_URL || "http://localhost:3000";
+  const cmsUrl = context.cmsUrl;
 
   const res = await fetch(`${cmsUrl}/api/users/login`, {
     method: "POST",

@@ -14,6 +14,9 @@ import { Areas } from './collections/Areas'
 import { Highlights } from './collections/Highlights'
 import { Trails } from './collections/Trails'
 import { GpxFiles } from './collections/GpxFiles'
+import { Payments } from './collections/Payments'
+import { Events } from './collections/Events'
+import { Blog } from './collections/Blog'
 import { migrations } from './migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -58,7 +61,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media, GpxFiles, Areas, Highlights, Trails],
+  collections: [Users, Media, GpxFiles, Areas, Highlights, Trails, Payments, Events, Blog],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
