@@ -345,6 +345,11 @@ export const Trails: CollectionConfig = {
               const gpxContent = await fetch(absUrl).then((r) => r.text())
               trailhead = extractTrailheadFromGpx(gpxContent)
 
+              // Back-fill gps field from GPX trailhead (only if not manually set)
+              if (trailhead && !data.gps) {
+                data.gps = `${trailhead.lat},${trailhead.lng}`
+              }
+
               // Auto-fill hiking stats (only if not manually set)
               const stats = parseGpxStats(gpxContent)
               if (stats) {
