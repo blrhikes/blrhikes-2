@@ -7,7 +7,12 @@ export const Payments: CollectionConfig = {
     defaultColumns: ['user', 'plan', 'amount', 'status', 'createdAt'],
   },
   access: {
-    read: ({ req }) => !!req.user,
+    read: ({ req }) => {
+      if (!req.user) return false
+      if (req.user.role === 'admin') return true
+      // Users can only read their own payments
+      return { user: { equals: req.user.id } }
+    },
     create: () => false, // created only via webhook handler
     update: () => false,
     delete: ({ req }) => req.user?.role === 'admin',

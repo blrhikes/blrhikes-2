@@ -7,7 +7,11 @@ export const Events: CollectionConfig = {
     defaultColumns: ['title', 'date', 'trail', 'status'],
   },
   access: {
-    read: () => true,
+    read: ({ req }) => {
+      // Admins/editors see everything; public only sees non-draft events
+      if (req.user) return true
+      return { status: { not_equals: 'draft' } }
+    },
     create: ({ req }) => !!req.user,
     update: ({ req }) => !!req.user,
     delete: ({ req }) => !!req.user,

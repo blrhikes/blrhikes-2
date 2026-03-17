@@ -7,7 +7,11 @@ export const Blog: CollectionConfig = {
     defaultColumns: ['title', 'author', 'publishedAt', 'status'],
   },
   access: {
-    read: () => true,
+    read: ({ req }) => {
+      // Admins/editors see everything; public only sees published posts
+      if (req.user) return true
+      return { status: { equals: 'published' } }
+    },
     create: ({ req }) => !!req.user,
     update: ({ req }) => !!req.user,
     delete: ({ req }) => !!req.user,

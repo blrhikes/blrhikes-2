@@ -34,28 +34,36 @@ export function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+/** Extract lat/lon from a GPX element's opening tag, regardless of attribute order. */
+function extractLatLon(tag: string): { lat: number; lng: number } | null {
+  const latMatch = tag.match(/lat="([^"]+)"/)
+  const lonMatch = tag.match(/lon="([^"]+)"/)
+  if (!latMatch || !lonMatch) return null
+  const lat = parseFloat(latMatch[1])
+  const lng = parseFloat(lonMatch[1])
+  if (isNaN(lat) || isNaN(lng)) return null
+  return { lat, lng }
+}
+
 /**
  * Extract trailhead coordinates from GPX XML content.
  * Tries explicit waypoints (<wpt>) first, then falls back to the first
  * track point (<trkpt>) which is the start of the route.
+ * Handles both lat-before-lon and lon-before-lat attribute ordering.
  */
 export function extractTrailheadFromGpx(
   gpxContent: string,
 ): { lat: number; lng: number } | null {
-  // <wpt lat="12.34" lon="77.56"> — explicit trailhead/waypoint
-  const wptMatch = gpxContent.match(/<wpt\s[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"/)
+  const wptMatch = gpxContent.match(/<wpt\s[^>]+>/)
   if (wptMatch) {
-    const lat = parseFloat(wptMatch[1])
-    const lng = parseFloat(wptMatch[2])
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+    const coords = extractLatLon(wptMatch[0])
+    if (coords) return coords
   }
 
-  // <trkpt lat="12.34" lon="77.56"> — first point of the recorded track
-  const trkptMatch = gpxContent.match(/<trkpt\s[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"/)
+  const trkptMatch = gpxContent.match(/<trkpt\s[^>]+>/)
   if (trkptMatch) {
-    const lat = parseFloat(trkptMatch[1])
-    const lng = parseFloat(trkptMatch[2])
-    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng }
+    const coords = extractLatLon(trkptMatch[0])
+    if (coords) return coords
   }
 
   return null
@@ -101,8 +109,8 @@ export function distanceFromBangaloreCenter(trailhead: {
  * Returns null if no trackpoints found.
  */
 export function parseGpxStats(gpxContent: string): GpxStats | null {
-  // Extract all <trkpt lat="..." lon="...">...<ele>...</ele>...</trkpt> blocks
-  const trkptRegex = /<trkpt\s[^>]*lat="([^"]+)"[^>]*lon="([^"]+)"[^>]*>([\s\S]*?)<\/trkpt>/g
+  // Match full <trkpt ...>...</trkpt> blocks; lat/lon order within the tag doesn't matter
+  const trkptRegex = /<trkpt\s([^>]+)>([\s\S]*?)<\/trkpt>/g
   const eleRegex = /<ele>([^<]+)<\/ele>/
 
   interface Point { lat: number; lng: number; ele: number | null }
@@ -110,14 +118,13 @@ export function parseGpxStats(gpxContent: string): GpxStats | null {
 
   let match: RegExpExecArray | null
   while ((match = trkptRegex.exec(gpxContent)) !== null) {
-    const lat = parseFloat(match[1])
-    const lng = parseFloat(match[2])
-    if (isNaN(lat) || isNaN(lng)) continue
+    const coords = extractLatLon(match[1])
+    if (!coords) continue
 
-    const eleMatch = eleRegex.exec(match[3])
+    const eleMatch = eleRegex.exec(match[2])
     const ele = eleMatch ? parseFloat(eleMatch[1]) : null
 
-    points.push({ lat, lng, ele: ele !== null && !isNaN(ele) ? ele : null })
+    points.push({ ...coords, ele: ele !== null && !isNaN(ele) ? ele : null })
   }
 
   if (points.length < 2) return null

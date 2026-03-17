@@ -5,7 +5,7 @@
  * Env var required: HERE_API_KEY
  */
 
-const BANGALORE_CENTER = '12.9716,77.5946'
+import { BANGALORE_CENTER } from './gpx'
 
 interface HereRoute {
   routes: Array<{
@@ -53,7 +53,7 @@ export async function getDrivingInfoFromBangalore(trailhead: {
     return null
   }
 
-  const origin = BANGALORE_CENTER
+  const origin = `${BANGALORE_CENTER.lat},${BANGALORE_CENTER.lng}`
   const destination = `${trailhead.lat},${trailhead.lng}`
 
   const url = new URL('https://router.hereapi.com/v8/routes')
