@@ -355,6 +355,7 @@ export const Trails: CollectionConfig = {
               if (stats) {
                 if (!data.length) data.length = stats.length
                 if (!data.elevationGain) data.elevationGain = stats.elevationGain
+                if (!data.elevation && stats.peakElevation !== null) data.elevation = stats.peakElevation
                 if (!data.hikingTime) data.hikingTime = stats.hikingTime
                 if (!data.hikingTimeWithRests) data.hikingTimeWithRests = stats.hikingTimeWithRests
                 req.payload.logger.info(

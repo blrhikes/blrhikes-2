@@ -6,6 +6,8 @@ export interface GpxStats {
   length: number
   /** Cumulative elevation gain in metres, rounded to nearest 5m */
   elevationGain: number
+  /** Peak (maximum) elevation in metres, rounded to nearest metre */
+  peakElevation: number | null
   /** Estimated hiking time in minutes (Naismith's rule, one-way) */
   hikingTime: number
   /** Estimated hiking time with rests (+20%) in minutes */
@@ -131,6 +133,7 @@ export function parseGpxStats(gpxContent: string): GpxStats | null {
 
   let totalDistance = 0
   let totalElevationGain = 0
+  let peakElevation: number | null = null
 
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1]
@@ -142,6 +145,14 @@ export function parseGpxStats(gpxContent: string): GpxStats | null {
       const delta = curr.ele - prev.ele
       if (delta > 0) totalElevationGain += delta
     }
+
+    if (curr.ele !== null && (peakElevation === null || curr.ele > peakElevation)) {
+      peakElevation = curr.ele
+    }
+  }
+  // Check first point too
+  if (points[0].ele !== null && (peakElevation === null || points[0].ele > peakElevation)) {
+    peakElevation = points[0].ele
   }
 
   // Naismith's rule: time (hrs) = distance/5 + elevationGain/600
@@ -152,6 +163,7 @@ export function parseGpxStats(gpxContent: string): GpxStats | null {
   return {
     length: Math.round(totalDistance * 10) / 10,
     elevationGain: Math.round(totalElevationGain / 5) * 5, // round to nearest 5m
+    peakElevation: peakElevation !== null ? Math.round(peakElevation) : null,
     hikingTime,
     hikingTimeWithRests,
   }
