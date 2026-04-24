@@ -11,7 +11,10 @@ export const Users: CollectionConfig = {
   auth: {
     useAPIKey: true,
     cookies: {
-      domain: isProduction ? '.blrhikes.com' : undefined,
+      // Leading dot → cookie is valid for the apex (blrhikes.in) plus every
+      // subdomain (cms.blrhikes.in, cms-test.blrhikes.in, test.blrhikes.in,
+      // blrhikes.in itself). Leaving dev undefined keeps it scoped to localhost.
+      domain: isProduction ? '.blrhikes.in' : undefined,
       sameSite: 'Lax',
       secure: isProduction,
     },
