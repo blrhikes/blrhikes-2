@@ -14,6 +14,7 @@ import { Areas } from './collections/Areas'
 import { Highlights } from './collections/Highlights'
 import { Trails } from './collections/Trails'
 import { GpxFiles } from './collections/GpxFiles'
+import { resendAdapter } from './email/resend'
 import { migrations } from './migrations'
 
 const filename = fileURLToPath(import.meta.url)
@@ -49,9 +50,13 @@ const cloudflare =
     : await getCloudflareContext({ async: true })
 
 export default buildConfig({
-  serverURL: process.env.PAYLOAD_SERVER_URL || 'http://localhost:3000',
-  cors: ['https://beta.blrhikes.com', 'http://localhost:5173'],
-  csrf: ['https://beta.blrhikes.com', 'http://localhost:5173'],
+  // Absolute base used by Payload when it generates URLs in system emails
+  // (forgot-password, email verification). Without this, Payload emits
+  // path-only URLs that mail clients mangle. Sourced from the env per
+  // CLOUDFLARE_ENV (see wrangler.jsonc vars).
+  serverURL: process.env.CMS_URL || 'http://localhost:3000',
+  cors: [process.env.WEB_URL || 'http://localhost:5173'],
+  csrf: [process.env.WEB_URL || 'http://localhost:5173'],
   admin: {
     user: Users.slug,
     importMap: {
@@ -60,6 +65,7 @@ export default buildConfig({
   },
   collections: [Users, Media, GpxFiles, Areas, Highlights, Trails],
   editor: lexicalEditor(),
+  email: resendAdapter(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
