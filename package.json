@@ -6,8 +6,8 @@
     "dev:web": "pnpm --filter @blrhikes/web dev",
     "build:cms": "pnpm --filter cms build",
     "build:web": "pnpm --filter @blrhikes/web build",
-    "migrate": "pnpm --filter cms payload migrate",
-    "migrate:create": "pnpm --filter cms payload migrate:create",
+    "migrate": "pnpm --filter cms migrate",
+    "migrate:create": "pnpm --filter cms migrate:create",
     "seed": "pnpm --filter @blrhikes/scripts seed",
     "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx"
   },

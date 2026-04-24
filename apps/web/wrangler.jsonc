@@ -1,11 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "main": "./workers/app.ts",
-  "account_id": "<YOUR_CLOUDFLARE_ACCOUNT_ID>",
+  "account_id": "2b193209af2d4a6412693d956514074e",
   "compatibility_date": "2025-04-04",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   // Top-level has no bindings/vars/routes by design (washi pattern). Every
   // deploy must pick an env explicitly with `--env=<name>`. Local dev uses
@@ -16,17 +16,17 @@
     "test": {
       "name": "blrhikes-web-test",
       "vars": {
-        "CMS_URL": "https://cms-test.blrhikes.in"
+        "CMS_URL": "https://cms-test.blrhikes.in",
       },
-      "routes": [{ "pattern": "test.blrhikes.in", "custom_domain": true }]
+      "routes": [{ "pattern": "test.blrhikes.in", "custom_domain": true }],
     },
     // Remote prod. blrhikes.in.
     "live": {
       "name": "blrhikes-web-live",
       "vars": {
-        "CMS_URL": "https://cms.blrhikes.in"
+        "CMS_URL": "https://cms.blrhikes.in",
       },
-      "routes": [{ "pattern": "blrhikes.in", "custom_domain": true }]
-    }
-  }
+      "routes": [{ "pattern": "blrhikes.in", "custom_domain": true }],
+    },
+  },
 }

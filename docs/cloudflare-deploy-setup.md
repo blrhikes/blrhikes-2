@@ -39,24 +39,86 @@ Commit this after you create the D1 databases in step 2 (you'll update the D1 `d
 
 ## 2. Create the D1 databases + R2 buckets
 
-In the dashboard:
+CLI is faster and scripts cleanly. Authenticate once with `wrangler login` (opens browser), then run the commands below. Dashboard steps are also listed as a fallback.
+
+### Auth (one-time)
+
+```bash
+# From repo root
+pnpm --filter cms exec wrangler login
+# Opens a browser → authorize wrangler against your CF account
+```
+
+All `wrangler` commands below are run via the cms package so they use the same pinned version as deploys.
 
 ### D1 (both envs)
 
+```bash
+# Create — APAC location hint routes the primary replica to the closest region (BOM).
+pnpm --filter cms exec wrangler d1 create blrhikes-test --location=apac
+pnpm --filter cms exec wrangler d1 create blrhikes-live --location=apac
+```
+
+Each `create` command prints a block like:
+
+```
+✅ Successfully created DB 'blrhikes-test' in region APAC
+Created your new D1 database.
+
+[[d1_databases]]
+binding = "D1"
+database_name = "blrhikes-test"
+database_id = "97df08dc-07ad-4bfb-a89e-fd1156758e68"
+```
+
+Copy the `database_id` values and paste them into `apps/cms/wrangler.jsonc`:
+
+- `env.test.d1_databases[0].database_id` ← id from `blrhikes-test`
+- `env.live.d1_databases[0].database_id` ← id from `blrhikes-live`
+
+Verify:
+
+```bash
+pnpm --filter cms exec wrangler d1 list
+```
+
+<details>
+<summary>Dashboard fallback</summary>
+
 1. **Workers & Pages → D1 SQL Database → Create**
 2. Name: `blrhikes-test`, location: closest to Bangalore (BOM is a good default).
-3. Copy the **Database ID** shown on the DB detail page.
-4. In `apps/cms/wrangler.jsonc`, `env.test.d1_databases[0].database_id` → paste.
-5. Repeat for `blrhikes-live` → paste into `env.live.d1_databases[0].database_id`.
+3. Copy the **Database ID** from the DB detail page.
+4. Paste into `apps/cms/wrangler.jsonc` → `env.test.d1_databases[0].database_id`.
+5. Repeat for `blrhikes-live`.
+</details>
 
 ### R2 (both envs)
 
+```bash
+# Create. --location=apac is a hint, not a guarantee — CF picks the nearest
+# cluster in the hinted region. Safe to omit if you don't care.
+pnpm --filter cms exec wrangler r2 bucket create blrhikes-test --location=apac
+pnpm --filter cms exec wrangler r2 bucket create blrhikes-live --location=apac
+```
+
+R2 bucket names are global-per-account, not global-per-CF, so you'll get one even if the name is taken elsewhere. Public access is **disabled by default** — the CMS serves files through the worker's R2 binding, so leave it that way.
+
+Verify:
+
+```bash
+pnpm --filter cms exec wrangler r2 bucket list
+```
+
+<details>
+<summary>Dashboard fallback</summary>
+
 1. **R2 → Create bucket**
 2. Name: `blrhikes-test`, location hint: APAC/BOM.
-3. Public access: **disabled** (CMS serves files through the worker's R2 binding — buckets stay private).
+3. Public access: **disabled** (CMS serves files through the worker's R2 binding).
 4. Repeat for `blrhikes-live`.
+</details>
 
-Commit the wrangler.jsonc updates.
+Commit the wrangler.jsonc updates (D1 ids are the only real change).
 
 ## 3. Create the 4 Workers via GitHub integration
 
