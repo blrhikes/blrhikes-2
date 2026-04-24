@@ -153,6 +153,43 @@ Do the same if any other runtime secret surfaces later (e.g. `HERE_API_KEY` for 
 
 The Web worker doesn't need secrets for now. `CMS_URL` is already in the `vars` block of wrangler.jsonc and will be set by the deploy.
 
+### Variables reference — what lives where
+
+Cloudflare Workers has three distinct "places" a variable can come from, and they're not interchangeable. Getting them mixed up is the #1 way deploys look like they work but the worker misbehaves.
+
+| Source | Set via | Visible at | Contents |
+|--------|---------|------------|----------|
+| **Build-time env** | Dashboard → worker → `Settings → Builds → Variables` | Build container only. **Not** at runtime. | `CLOUDFLARE_ENV` — drives `opennextjs-cloudflare build --env=$…` and any other `$…` expansion in your build command. |
+| **wrangler.jsonc `vars`** | `env.<name>.vars` in `wrangler.jsonc` (committed) | Worker runtime, as `env.FOO` in worker code. Public (anyone can read via bundle inspection / dashboard). | Plain configuration: `CMS_URL`, `WEB_URL`. |
+| **Wrangler secrets** | Dashboard → worker → `Settings → Variables and Secrets → Add (type: Secret)`, or `wrangler secret put FOO --env <env>` | Worker runtime, same `env.FOO` shape. Encrypted at rest. | `PAYLOAD_SECRET`, any API keys (`HERE_API_KEY`, etc.). |
+
+Bindings (D1, R2, KV, Service Bindings) are a fourth thing — declared in `wrangler.jsonc` env blocks, injected into `env` at runtime, never exposed to your code as strings.
+
+#### Per-app cheatsheet
+
+**`apps/cms` CMS worker**
+
+| Variable | Phase | Type | Where set | Required? |
+|----------|-------|------|-----------|-----------|
+| `CLOUDFLARE_ENV` | build | build-env | Dashboard → `Settings → Builds → Variables` — set to `test` or `live` per worker | Yes |
+| `WEB_URL` | runtime | plain var | `env.test/live.vars` in `apps/cms/wrangler.jsonc` | Yes |
+| `CMS_URL` | runtime | plain var | same | Yes |
+| `PAYLOAD_SECRET` | runtime | secret | Dashboard → `Variables and Secrets` (different value per env) | Yes |
+| `HERE_API_KEY` | runtime | secret | Dashboard → `Variables and Secrets` | Only if driving calcs are enabled (`apps/cms/src/lib/driving.ts`) |
+| `D1` binding | runtime | binding | `env.*.d1_databases` in wrangler.jsonc | Yes |
+| `R2` binding | runtime | binding | `env.*.r2_buckets` in wrangler.jsonc | Yes |
+
+**`apps/web` Web worker**
+
+| Variable | Phase | Type | Where set | Required? |
+|----------|-------|------|-----------|-----------|
+| *(none)* | build | — | — | The web build is pure Vite — no build-time env vars needed |
+| `CMS_URL` | runtime | plain var | `env.test/live.vars` in `apps/web/wrangler.jsonc` | Yes |
+
+#### Common gotcha
+
+Do **not** put `CLOUDFLARE_ENV` in wrangler.jsonc `vars` thinking it'll reach the build — `vars` is runtime-only. The build command `build:cf` expands `$CLOUDFLARE_ENV` from the build container's shell, which only gets populated from Dashboard → `Settings → Builds → Variables`.
+
 ## 5. Bind D1 + R2 to the CMS workers
 
 Bindings are declared in `apps/cms/wrangler.jsonc` per env — CF will pick them up on deploy. But you need to verify the D1 database names and R2 bucket names in the dashboard match what's in the jsonc. If they don't, deploys will 500 with "binding not found".
