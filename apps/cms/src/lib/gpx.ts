@@ -1,3 +1,6 @@
+import { DOMParser } from '@xmldom/xmldom'
+import { gpx as gpxToGeoJson } from '@tmcw/togeojson'
+
 /** Center of Bangalore (Cubbon Park) */
 export const BANGALORE_CENTER = { lat: 12.9763, lng: 77.5929 }
 
@@ -10,8 +13,10 @@ export interface GpxStats {
   peakElevation: number | null
   /** Estimated hiking time in minutes (Naismith's rule, one-way) */
   hikingTime: number
-  /** Estimated hiking time with rests (+20%) in minutes */
+  /** Estimated hiking time with rests in minutes (2x base) */
   hikingTimeWithRests: number
+  /** Estimated hiking time with rests + exploration in minutes (3x base) */
+  hikingTimeWithExploration: number
 }
 
 /**
@@ -36,36 +41,63 @@ export function haversineDistance(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-/** Extract lat/lon from a GPX element's opening tag, regardless of attribute order. */
-function extractLatLon(tag: string): { lat: number; lng: number } | null {
-  const latMatch = tag.match(/lat="([^"]+)"/)
-  const lonMatch = tag.match(/lon="([^"]+)"/)
-  if (!latMatch || !lonMatch) return null
-  const lat = parseFloat(latMatch[1])
-  const lng = parseFloat(lonMatch[1])
-  if (isNaN(lat) || isNaN(lng)) return null
-  return { lat, lng }
+/** Parse GPX XML into a GeoJSON FeatureCollection via @tmcw/togeojson. */
+function parseGpx(gpxContent: string) {
+  const doc = new DOMParser().parseFromString(gpxContent, 'text/xml')
+  return gpxToGeoJson(doc as unknown as Document)
+}
+
+interface Point { lat: number; lng: number; ele: number | null }
+
+/** Flatten all track points (including MultiLineString segments) into a single list. */
+function collectTrackPoints(fc: ReturnType<typeof parseGpx>): Point[] {
+  const points: Point[] = []
+  for (const feature of fc.features) {
+    const geom = feature.geometry
+    if (!geom) continue
+    const lines: number[][][] =
+      geom.type === 'LineString'
+        ? [geom.coordinates as number[][]]
+        : geom.type === 'MultiLineString'
+        ? (geom.coordinates as number[][][])
+        : []
+    for (const line of lines) {
+      for (const coord of line) {
+        const [lng, lat, ele] = coord
+        if (typeof lat !== 'number' || typeof lng !== 'number') continue
+        points.push({ lat, lng, ele: typeof ele === 'number' ? ele : null })
+      }
+    }
+  }
+  return points
 }
 
 /**
  * Extract trailhead coordinates from GPX XML content.
- * Tries explicit waypoints (<wpt>) first, then falls back to the first
- * track point (<trkpt>) which is the start of the route.
- * Handles both lat-before-lon and lon-before-lat attribute ordering.
+ *
+ * Prefers the **first point of the recorded track** (the actual start of the hike).
+ * Falls back to the first waypoint only if the file has no track — waypoints in
+ * real-world exports (Gaia, Garmin, etc.) are typically POIs (shrine, hilltop,
+ * cave, etc.) rather than the trailhead.
  */
 export function extractTrailheadFromGpx(
   gpxContent: string,
 ): { lat: number; lng: number } | null {
-  const wptMatch = gpxContent.match(/<wpt\s[^>]+>/)
-  if (wptMatch) {
-    const coords = extractLatLon(wptMatch[0])
-    if (coords) return coords
+  let fc: ReturnType<typeof parseGpx>
+  try {
+    fc = parseGpx(gpxContent)
+  } catch {
+    return null
   }
 
-  const trkptMatch = gpxContent.match(/<trkpt\s[^>]+>/)
-  if (trkptMatch) {
-    const coords = extractLatLon(trkptMatch[0])
-    if (coords) return coords
+  const points = collectTrackPoints(fc)
+  if (points.length > 0) return { lat: points[0].lat, lng: points[0].lng }
+
+  for (const feature of fc.features) {
+    if (feature.geometry?.type === 'Point') {
+      const [lng, lat] = feature.geometry.coordinates as number[]
+      if (typeof lat === 'number' && typeof lng === 'number') return { lat, lng }
+    }
   }
 
   return null
@@ -100,40 +132,71 @@ export function distanceFromBangaloreCenter(trailhead: {
   return Math.round(raw * 10) / 10
 }
 
+export type CompassDirection =
+  | 'north'
+  | 'northeast'
+  | 'east'
+  | 'southeast'
+  | 'south'
+  | 'southwest'
+  | 'west'
+  | 'northwest'
+
+/**
+ * 8-point compass direction from Bangalore center to the given trailhead.
+ * Ports the legacy webhook-listeners getRelativeLocation.js logic:
+ *   angle = atan2(dLng, dLat), bucketed into 45° arcs starting at north.
+ * Bangalore-centric, so it's fine to use flat (dLat, dLng) math — Mercator
+ * distortion is negligible at these distances (< 150 km).
+ */
+export function getRelativeLocationFromBangalore(trailhead: {
+  lat: number
+  lng: number
+}): CompassDirection | null {
+  const dLat = trailhead.lat - BANGALORE_CENTER.lat
+  const dLng = trailhead.lng - BANGALORE_CENTER.lng
+  if (dLat === 0 && dLng === 0) return null
+
+  const deg = (Math.atan2(dLng, dLat) * 180) / Math.PI
+
+  if (deg > -22.5 && deg <= 22.5) return 'north'
+  if (deg > 22.5 && deg <= 67.5) return 'northeast'
+  if (deg > 67.5 && deg <= 112.5) return 'east'
+  if (deg > 112.5 && deg <= 157.5) return 'southeast'
+  if (deg > 157.5 || deg <= -157.5) return 'south'
+  if (deg > -157.5 && deg <= -112.5) return 'southwest'
+  if (deg > -112.5 && deg <= -67.5) return 'west'
+  if (deg > -67.5 && deg <= -22.5) return 'northwest'
+  return null
+}
+
 /**
  * Parse hiking stats from GPX XML content.
  *
  * Calculates:
  * - Total trail distance (sum of Haversine between consecutive trackpoints)
  * - Elevation gain (sum of positive ele deltas)
+ * - Peak elevation
  * - Hiking time via Naismith's rule: 1hr/5km + 1hr/600m gain
+ * - hikingTimeWithRests = 2x base, hikingTimeWithExploration = 3x base
+ *   (matches legacy blrhikes-webhook-listeners/lib/timeOnTrail.js)
  *
- * Returns null if no trackpoints found.
+ * Returns null if fewer than 2 trackpoints found.
  */
 export function parseGpxStats(gpxContent: string): GpxStats | null {
-  // Match full <trkpt ...>...</trkpt> blocks; lat/lon order within the tag doesn't matter
-  const trkptRegex = /<trkpt\s([^>]+)>([\s\S]*?)<\/trkpt>/g
-  const eleRegex = /<ele>([^<]+)<\/ele>/
-
-  interface Point { lat: number; lng: number; ele: number | null }
-  const points: Point[] = []
-
-  let match: RegExpExecArray | null
-  while ((match = trkptRegex.exec(gpxContent)) !== null) {
-    const coords = extractLatLon(match[1])
-    if (!coords) continue
-
-    const eleMatch = eleRegex.exec(match[2])
-    const ele = eleMatch ? parseFloat(eleMatch[1]) : null
-
-    points.push({ ...coords, ele: ele !== null && !isNaN(ele) ? ele : null })
+  let fc: ReturnType<typeof parseGpx>
+  try {
+    fc = parseGpx(gpxContent)
+  } catch {
+    return null
   }
 
+  const points = collectTrackPoints(fc)
   if (points.length < 2) return null
 
   let totalDistance = 0
   let totalElevationGain = 0
-  let peakElevation: number | null = null
+  let peakElevation: number | null = points[0].ele
 
   for (let i = 1; i < points.length; i++) {
     const prev = points[i - 1]
@@ -150,21 +213,17 @@ export function parseGpxStats(gpxContent: string): GpxStats | null {
       peakElevation = curr.ele
     }
   }
-  // Check first point too
-  if (points[0].ele !== null && (peakElevation === null || points[0].ele > peakElevation)) {
-    peakElevation = points[0].ele
-  }
 
   // Naismith's rule: time (hrs) = distance/5 + elevationGain/600
   const hikingHours = totalDistance / 5 + totalElevationGain / 600
   const hikingTime = Math.round(hikingHours * 60)
-  const hikingTimeWithRests = Math.round(hikingTime * 1.2)
 
   return {
     length: Math.round(totalDistance * 10) / 10,
     elevationGain: Math.round(totalElevationGain / 5) * 5, // round to nearest 5m
     peakElevation: peakElevation !== null ? Math.round(peakElevation) : null,
     hikingTime,
-    hikingTimeWithRests,
+    hikingTimeWithRests: hikingTime * 2,
+    hikingTimeWithExploration: hikingTime * 3,
   }
 }

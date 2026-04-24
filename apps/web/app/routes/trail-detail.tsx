@@ -1,7 +1,13 @@
-import { Form, Link, data } from "react-router";
+import { Form, Link, Outlet, data, redirect, useViewTransitionState } from "react-router";
 import type { Route } from "./+types/trail-detail";
-import { fetchTrailBySlug } from "../lib/api.server";
-import type { AuthUser } from "@blrhikes/shared";
+import { fetchTrailById, fetchTrailBySlug } from "../lib/api.server";
+import {
+  formatHikingTimeRange,
+  roundToHours,
+  type AuthUser,
+  type TrailSection,
+  type TrailGalleryItem,
+} from "@blrhikes/shared";
 import Markdown from "react-markdown";
 import rehypeExternalLinks from "rehype-external-links";
 import { BottomNav } from "../components/bottom-nav";
@@ -26,11 +32,29 @@ export function meta({ data: loaderData }: Route.MetaArgs) {
   ];
 }
 
+// URL resolution:
+//   /trails/131                        → fetch by id=131, redirect to canonical slug
+//   /trails/131-glasswater-lake-hike   → fetch by id=131, verify slug matches
+//   /trails/glasswater-lake-hike       → legacy slug lookup, redirect to canonical
+// Canonical slug = `<id>-<altName-slug>` (Trails.ts afterChange keeps it current).
 export async function loader({ params, context }: Route.LoaderArgs) {
-  const trail = await fetchTrailBySlug(context.cmsUrl, params.slug, context.payloadToken ?? undefined);
+  const segment = params.slug;
+  const idMatch = segment.match(/^(\d+)(?:-.*)?$/);
+
+  const trail = idMatch
+    ? await fetchTrailById(context.cmsUrl, Number(idMatch[1]), context.payloadToken ?? undefined)
+    : await fetchTrailBySlug(context.cmsUrl, segment, context.payloadToken ?? undefined);
+
   if (!trail) {
     throw data(null, { status: 404 });
   }
+
+  // Redirect any non-canonical URL (bare id, old slug, stale slug) to the
+  // current canonical slug so links stay tidy and SEO is happy.
+  if (trail.slug && trail.slug !== segment) {
+    throw redirect(`/trails/${trail.slug}`);
+  }
+
   return { trail, user: context.user, cmsUrl: context.cmsUrl };
 }
 
@@ -61,15 +85,6 @@ const accessLevels: Record<string, { icon: string; text: string; subtitle: strin
     subtitle: "No official monitoring. Hike at your own risk.",
   },
 };
-
-function formatMinutes(minutes: number | undefined): string {
-  if (!minutes) return "—";
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}min`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
 
 function Stat({
   value,
@@ -110,12 +125,151 @@ function Tag({ text }: { text: string }) {
   );
 }
 
+// A section is "locked" when the afterRead hook wiped its body for an
+// unentitled viewer. We infer this from (visibility === 'members') + !body
+// rather than a separate API flag.
+function isSectionLocked(section: TrailSection): boolean {
+  return section.visibility === "members" && !section.body;
+}
+
+function TableOfContents({ sections }: { sections: TrailSection[] }) {
+  if (sections.length < 2) return null;
+  return (
+    <nav
+      aria-label="On this page"
+      className="not-prose my-8 rounded-lg border border-stone-200 bg-white/60 p-4 text-sm"
+    >
+      <p className="mb-2 font-semibold text-stone-700">On this page</p>
+      <ol className="flex flex-col gap-1">
+        {sections.map((s) => (
+          <li key={s.slug}>
+            <a
+              href={`#${s.slug}`}
+              className="text-stone-700 underline decoration-stone-300 underline-offset-2 hover:decoration-stone-600"
+            >
+              {s.heading}
+            </a>
+            {isSectionLocked(s) && (
+              <span className="ml-2 text-xs text-stone-500" aria-label="Members only">
+                🔒 Members
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+function SectionBlock({ section }: { section: TrailSection }) {
+  const locked = isSectionLocked(section);
+  return (
+    <section className="mt-10 first:mt-8">
+      <h2 id={section.slug} className="scroll-mt-24">
+        {section.heading}
+        {locked && (
+          <span className="ml-2 align-middle text-sm text-stone-500" aria-label="Members only">
+            🔒
+          </span>
+        )}
+      </h2>
+      {locked ? (
+        <div className="not-prose rounded-lg border border-stone-200 bg-stone-50 p-4 text-stone-700">
+          <p className="mb-2 text-sm">
+            This section is for members. Log in or upgrade to unlock detailed route notes,
+            local tips, and downloads.
+          </p>
+          <Link
+            to="/login"
+            className="inline-block rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-stone-50 transition hover:bg-stone-800"
+          >
+            Log in / Become a member
+          </Link>
+        </div>
+      ) : (
+        <>
+          {section.body && (
+            <Markdown
+              rehypePlugins={[[rehypeExternalLinks, { target: "_blank", rel: ["noopener", "noreferrer"] }]]}
+            >
+              {section.body}
+            </Markdown>
+          )}
+          {section.attachments && section.attachments.length > 0 && (
+            <ul className="not-prose mt-4 flex flex-col gap-2">
+              {section.attachments.map((att, i) => {
+                const url = att.file?.url;
+                if (!url) return null;
+                const label = att.label || att.file?.alt || `Download ${i + 1}`;
+                const isGpx = att.file?.kind === "gpx-files";
+                return (
+                  <li key={att.id || i}>
+                    <a
+                      href={url}
+                      download
+                      className="inline-flex items-center gap-2 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-900 transition hover:bg-stone-100"
+                    >
+                      <span>{isGpx ? "📥" : "📎"}</span>
+                      <span>{label}</span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function GalleryThumbnail({
+  trailSlug,
+  photo,
+  index,
+}: {
+  trailSlug: string;
+  photo: TrailGalleryItem;
+  index: number;
+}) {
+  const url = photo.image?.url;
+  const mediaId = photo.image?.id;
+  const to = mediaId ? `/trails/${trailSlug}/photo/${mediaId}` : undefined;
+  // useViewTransitionState returns true only while *this* link is the active
+  // transition participant — applying the transition name conditionally
+  // prevents collisions between multiple thumbnails and the detail image.
+  const isTransitioning = useViewTransitionState(to || "");
+
+  if (!url) return null;
+
+  const img = (
+    <img
+      src={url}
+      alt={photo.image?.alt || photo.caption || `Photo ${index + 1}`}
+      loading="lazy"
+      className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+      style={isTransitioning ? { viewTransitionName: "trail-photo" } : undefined}
+    />
+  );
+
+  const wrapper = "group block aspect-[4/3] overflow-hidden rounded-lg bg-stone-200";
+
+  if (!to) {
+    return <div className={wrapper}>{img}</div>;
+  }
+
+  return (
+    <Link to={to} viewTransition className={wrapper}>
+      {img}
+    </Link>
+  );
+}
+
 export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
   const { trail, user, cmsUrl } = loaderData;
-  const imageUrl = trail.coverImageUrl ? heroImageUrl(trail.coverImageUrl as string) : undefined;
-  const access = trail.access as string | undefined;
-  const accessInfo = access ? accessLevels[access] : undefined;
-  const highlights = trail.highlights as string[] | undefined;
+  const imageUrl = trail.coverImageUrl ? heroImageUrl(trail.coverImageUrl) : undefined;
+  const accessInfo = trail.access ? accessLevels[trail.access] : undefined;
+  const highlights = trail.highlights;
   const canEdit = user && (user.role === "admin" || user.role === "contributor");
   const cmsAdminUrl = `${cmsUrl}/admin/collections/trails/${trail.id}`;
 
@@ -124,7 +278,7 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
       {/* Hero Section — full-bleed image with overlaid content */}
       <section className="relative -mt-0 h-[70vh] lg:h-[95vh]">
         {imageUrl ? (
-          <img src={imageUrl} alt={trail.title as string} className="h-full w-full object-cover object-top" />
+          <img src={imageUrl} alt={trail.title} className="h-full w-full object-cover object-top" />
         ) : (
           <div className="h-full w-full bg-stone-300" />
         )}
@@ -163,9 +317,11 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
               >
                 ← Back to Trails
               </Link>
-              <h1 className="text-4xl font-bold text-white lg:text-5xl">{trail.title as string}</h1>
-              {trail.altName && <p className="mt-1 text-lg italic text-stone-300">{trail.altName as string}</p>}
-              <p className="mt-2 text-xl font-semibold text-white lg:text-3xl">{trail.area as string}</p>
+              <h1 className="text-4xl font-bold text-white lg:text-5xl">{trail.title}</h1>
+              {trail.altName && <p className="mt-1 text-lg italic text-stone-300">{trail.altName}</p>}
+              {trail.area && (
+                <p className="mt-2 text-xl font-semibold text-white lg:text-3xl">{trail.area}</p>
+              )}
             </div>
           </div>
         </div>
@@ -216,16 +372,18 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
         <div className="not-prose grid grid-cols-3 gap-2 border-b border-stone-200 py-4 md:flex md:items-center md:justify-between md:py-3">
           {trail.length != null && <Stat value={String(trail.length)} unit="km" label="Total Length" />}
           {trail.elevationGain != null && <Stat value={String(trail.elevationGain)} unit="m" label="Elevation Gain" />}
-          {(trail.hikingTime != null || trail.hikingTimeWithRests != null) && (
-            <Stat
-              value={
-                trail.hikingTime != null && trail.hikingTimeWithRests != null
-                  ? `${formatMinutes(trail.hikingTime as number)}-${formatMinutes(trail.hikingTimeWithRests as number)}`
-                  : formatMinutes((trail.hikingTime ?? trail.hikingTimeWithRests) as number)
-              }
-              label="Hiking Time"
-            />
-          )}
+          {(() => {
+            const { hikingTimeWithRests: lo, hikingTimeWithExploration: hi } = trail;
+            if (lo == null && hi == null) return null;
+            let value: string;
+            if (lo != null && hi != null) {
+              value = formatHikingTimeRange(lo, hi);
+            } else {
+              const h = roundToHours((lo ?? hi) as number);
+              value = `${h} ${h === 1 ? "hour" : "hours"}`;
+            }
+            return <Stat value={value} label="Hiking Time" />;
+          })()}
           {(trail.drivingTimeText || trail.drivingDistanceText) && (
             <>
               <div className="hidden md:mx-2 md:block md:h-12 md:border-l md:border-stone-200" />
@@ -256,7 +414,7 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
           {trail.mapLink && (
             <a
               className="flex flex-col justify-center rounded-lg bg-gradient-to-b from-stone-50 to-stone-200 px-4 pb-2 pt-3 text-center text-2xl font-semibold text-black shadow shadow-black/40 transition-all hover:from-yellow-50 hover:to-yellow-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
-              href={trail.mapLink as string}
+              href={trail.mapLink}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -264,41 +422,56 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
               <div className="text-sm font-normal">GaiaGPS Link</div>
             </a>
           )}
+          {trail.gpxFile?.url && (
+            <a
+              className="flex flex-col justify-center rounded-lg bg-gradient-to-b from-stone-50 to-stone-200 px-4 pb-2 pt-3 text-center text-2xl font-semibold text-black shadow shadow-black/40 transition-all hover:from-yellow-50 hover:to-yellow-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2"
+              href={trail.gpxFile.url}
+              download
+            >
+              <div>Download GPX 📥</div>
+              <div className="text-sm font-normal">Load into Gaia, Komoot, etc.</div>
+            </a>
+          )}
         </div>
 
-        {/* Trail content (markdown) */}
-        {trail.content && (
-          <div className="mt-8">
-            <Markdown rehypePlugins={[[rehypeExternalLinks, { target: "_blank", rel: ["noopener", "noreferrer"] }]]}>
-              {trail.content as string}
-            </Markdown>
-          </div>
+        {/* Body: structured sections preferred, fall back to legacy `content` */}
+        {trail.sections && trail.sections.length > 0 ? (
+          <>
+            <TableOfContents sections={trail.sections} />
+            {trail.sections.map((section) => (
+              <SectionBlock key={section.id || section.slug} section={section} />
+            ))}
+          </>
+        ) : (
+          trail.content && (
+            <div className="mt-8">
+              <Markdown rehypePlugins={[[rehypeExternalLinks, { target: "_blank", rel: ["noopener", "noreferrer"] }]]}>
+                {trail.content}
+              </Markdown>
+            </div>
+          )
         )}
 
-        {/* Photo gallery */}
-        {(trail.photos as any[] | undefined)?.length ? (
-          <div className="not-prose mt-8">
+        {/* Photo gallery — view-transitions grid; thumbnail → nested photo route */}
+        {trail.gallery && trail.gallery.length > 0 && (
+          <div className="not-prose mt-12">
             <h2 className="mb-3 text-lg font-bold text-stone-900">Photos</h2>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              {(trail.photos as any[]).map((photo, i) => {
-                const photoUrl = photo.image && typeof photo.image !== "string" ? photo.image.url : undefined;
-                if (!photoUrl) return null;
-                return (
-                  <div key={photo.id || i} className="aspect-[4/3] overflow-hidden rounded-lg bg-stone-200">
-                    <img
-                      src={photoUrl}
-                      alt={photo.image?.alt || `Photo ${i + 1}`}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  </div>
-                );
-              })}
+              {trail.gallery.map((photo, i) => (
+                <GalleryThumbnail
+                  key={photo.id || i}
+                  trailSlug={trail.slug}
+                  photo={photo}
+                  index={i}
+                />
+              ))}
             </div>
           </div>
-        ) : null}
+        )}
       </article>
       <BottomNav />
+      {/* Nested photo overlay (trails/:slug/photo/:photoId) */}
+      <Outlet />
     </div>
   );
 }

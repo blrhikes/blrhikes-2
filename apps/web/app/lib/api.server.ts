@@ -1,4 +1,4 @@
-import type { TrailListParams } from "@blrhikes/shared";
+import type { NormalizedTrail, TrailListParams } from "@blrhikes/shared";
 import { HIKING_DURATION_FILTERS } from "@blrhikes/shared";
 
 interface PayloadResponse<T> {
@@ -90,8 +90,8 @@ function buildHeaders(payloadToken?: string): HeadersInit {
   return { Cookie: `payload-token=${payloadToken}` };
 }
 
-function normalizeTrail<T extends Record<string, unknown>>(doc: T, cmsUrl: string): T {
-  const cleaned = { ...doc };
+function normalizeTrail(doc: Record<string, unknown>, cmsUrl: string): NormalizedTrail {
+  const cleaned: Record<string, unknown> = { ...doc };
 
   // Flatten coverImage group → coverImageUrl string
   const coverImage = cleaned.coverImage as
@@ -111,12 +111,48 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T, cmsUrl: strin
     }
   }
 
-  if (Array.isArray(cleaned.photos)) {
-    cleaned.photos = cleaned.photos.map((p: any) => {
-      if (p?.image?.url && typeof p.image.url === "string" && p.image.url.startsWith("/")) {
-        return { ...p, image: { ...p.image, url: `${cmsUrl}${p.image.url}` } };
+  // Absolutize gpxFile URL so the <a download> link works cross-origin
+  const gpxFile = cleaned.gpxFile as { url?: string } | undefined;
+  if (gpxFile?.url && typeof gpxFile.url === "string" && gpxFile.url.startsWith("/")) {
+    cleaned.gpxFile = { ...gpxFile, url: `${cmsUrl}${gpxFile.url}` };
+  }
+
+  if (Array.isArray(cleaned.gallery)) {
+    cleaned.gallery = cleaned.gallery.map((g: any) => {
+      if (g?.image?.url && typeof g.image.url === "string" && g.image.url.startsWith("/")) {
+        return { ...g, image: { ...g.image, url: `${cmsUrl}${g.image.url}` } };
       }
-      return p;
+      return g;
+    });
+  }
+
+  // Normalize sections[]: absolutize attachment URLs and flatten the
+  // polymorphic `file` relation ({ relationTo, value }) into a plain media ref
+  // with an extra `kind` tag so the frontend knows whether it's a GPX or other file.
+  if (Array.isArray(cleaned.sections)) {
+    cleaned.sections = cleaned.sections.map((s: any) => {
+      const attachments = Array.isArray(s?.attachments)
+        ? s.attachments.map((a: any) => {
+            const rel = a?.file;
+            if (!rel) return a;
+            // Polymorphic upload: rel = { relationTo, value: <media doc | id> }
+            const kind: "gpx-files" | "media" | undefined = rel.relationTo;
+            const value = rel.value ?? rel;
+            const media =
+              value && typeof value === "object"
+                ? value
+                : { id: value };
+            const absUrl =
+              media?.url && typeof media.url === "string" && media.url.startsWith("/")
+                ? `${cmsUrl}${media.url}`
+                : media?.url;
+            return {
+              ...a,
+              file: { ...media, url: absUrl, kind },
+            };
+          })
+        : s?.attachments;
+      return { ...s, attachments };
     });
   }
 
@@ -132,10 +168,14 @@ function normalizeTrail<T extends Record<string, unknown>>(doc: T, cmsUrl: strin
     );
   }
 
-  return cleaned;
+  return cleaned as unknown as NormalizedTrail;
 }
 
-export async function fetchTrails(cmsUrl: string, params: TrailListParams, payloadToken?: string) {
+export async function fetchTrails(
+  cmsUrl: string,
+  params: TrailListParams,
+  payloadToken?: string,
+): Promise<PayloadResponse<NormalizedTrail>> {
   const qs = buildTrailsQuery(params);
   const url = `${cmsUrl}/api/trails?${qs.toString()}`;
 
@@ -152,7 +192,11 @@ export async function fetchTrails(cmsUrl: string, params: TrailListParams, paylo
   };
 }
 
-export async function fetchTrailBySlug(cmsUrl: string, slug: string, payloadToken?: string) {
+export async function fetchTrailBySlug(
+  cmsUrl: string,
+  slug: string,
+  payloadToken?: string,
+): Promise<NormalizedTrail | null> {
   const qs = new URLSearchParams();
   qs.set("where[slug][equals]", slug);
   qs.set("where[status][equals]", "live");
@@ -170,4 +214,22 @@ export async function fetchTrailBySlug(cmsUrl: string, slug: string, payloadToke
   if (data.docs.length === 0) return null;
 
   return normalizeTrail(data.docs[0], cmsUrl);
+}
+
+export async function fetchTrailById(
+  cmsUrl: string,
+  id: number,
+  payloadToken?: string,
+): Promise<NormalizedTrail | null> {
+  // Using /api/trails/:id returns a single doc directly. Status filter is
+  // applied in-memory since the by-id endpoint doesn't support `where`.
+  const url = `${cmsUrl}/api/trails/${id}`;
+  const res = await fetch(url, { headers: buildHeaders(payloadToken) });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`CMS API error: ${res.status}`);
+  }
+  const doc = (await res.json()) as Record<string, unknown>;
+  if (doc.status !== "live") return null;
+  return normalizeTrail(doc, cmsUrl);
 }

@@ -12,26 +12,9 @@ import {
 // --- Configuration ---
 const GITHUB_REPO = "shreshthmohan/blrhikes-data";
 const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
-const CMS_EMAIL = process.env.CMS_EMAIL || "";
-const CMS_PASSWORD = process.env.CMS_PASSWORD || "";
+const CMS_API_KEY = process.env.CMS_API_KEY || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
 
-let CMS_TOKEN = "";
-
-async function loginToCMS(): Promise<void> {
-  const res = await fetch(`${CMS_URL}/api/users/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: CMS_EMAIL, password: CMS_PASSWORD }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`CMS login failed: ${res.status} ${text}`);
-  }
-  const data = (await res.json()) as { token: string };
-  CMS_TOKEN = data.token;
-  console.log("Logged in to CMS successfully.");
-}
 const FORCE = process.argv.includes("--force");
 const REFRESH = process.argv.includes("--refresh");
 
@@ -219,11 +202,20 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     ? extractCoverImageUrl(`![cover](${frontmatter.coverImage})`)
     : extractCoverImageUrl(issue.body || "");
 
+  const title = frontmatter.title || issue.title;
+  const altName = frontmatter.altName || frontmatter.alt_name;
+  // Slug is derived from altName only (title can be generic — "Nandi Hills" —
+  // altName is the descriptive nickname, which is what ends up in the URL).
+  // The real id prefix (`<trail.id>-...`) is stamped by a second PATCH in
+  // upsertTrail once Payload hands back the created doc's numeric id.
+  // Fallback to title, then to a placeholder, so validation passes at POST time.
+  const slugBase = slugify(altName || title) || `trail-${issue.number}`;
+
   return {
-    title: frontmatter.title || issue.title,
-    slug: slugify(frontmatter.title || issue.title),
+    title,
+    slug: slugBase,
     githubIssueNumber: issue.number,
-    altName: frontmatter.altName || frontmatter.alt_name,
+    altName,
     area: frontmatter.area || "Unknown",
     gps: frontmatter.gps,
     relativeLocation: frontmatter.relativeLocation || frontmatter.relative_location,
@@ -280,7 +272,7 @@ const areaCache = new Map<string, string>();
 const highlightCache = new Map<string, string>();
 
 const authHeaders = (): Record<string, string> =>
-  CMS_TOKEN ? { Authorization: `Bearer ${CMS_TOKEN}` } : {};
+  CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {};
 
 async function getOrCreateArea(name: string): Promise<string> {
   if (areaCache.has(name)) return areaCache.get(name)!;
@@ -400,6 +392,9 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     const text = await res.text();
     throw new Error(`Failed to ${method} trail "${trail.title}": ${res.status} ${text}`);
   }
+
+  // Slug canonicalization to `<id>-<altName-slug>` is handled server-side
+  // by the Trails collection's afterChange hook. No follow-up PATCH needed here.
 }
 
 // --- Local GitHub data cache ---
@@ -456,11 +451,13 @@ async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
 
 // --- Main ---
 async function main() {
-  console.log(`CMS_URL: ${CMS_URL}`);
-  console.log(`CMS_EMAIL: ${CMS_EMAIL || "(not set)"}`);
+  console.log(`CMS_URL:      ${CMS_URL}`);
+  console.log(`CMS_API_KEY:  ${CMS_API_KEY ? CMS_API_KEY.slice(0, 8) + "..." : "(not set)"}`);
   console.log(`GITHUB_TOKEN: ${GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 8) + "..." : "(not set)"}`);
-  console.log(`Force mode: ${FORCE ? "ON" : "OFF"}`);
-  await loginToCMS();
+  console.log(`Force mode:   ${FORCE ? "ON" : "OFF"}`);
+  if (!CMS_API_KEY) {
+    throw new Error("CMS_API_KEY must be set (see docs/content-sections-runbook.md §0)");
+  }
 
   const githubData = await loadOrFetchGitHubData();
 

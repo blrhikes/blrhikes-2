@@ -4,47 +4,53 @@ import { DIFFICULTY_OPTIONS, ACCESS_OPTIONS } from '@blrhikes/shared'
 import {
   distanceFromBangaloreCenter,
   extractTrailheadFromGpx,
+  getRelativeLocationFromBangalore,
   parseGpsField,
   parseGpxStats,
 } from '../lib/gpx'
-import { getDrivingInfoFromBangalore } from '../lib/driving'
+import {
+  getDrivingInfoFromBangalore,
+  getShortestRoadDistanceFromBangalore,
+} from '../lib/driving'
 
-/**
- * Field-level read access for gated fields.
- * Allows access if user:
- * - is admin or contributor (always)
- * - is lifetime member
- * - is yearly member with valid (non-expired) membership
- * - has purchased this specific trail
- */
-const canReadGatedField: FieldAccess = ({ req, doc }) => {
+// Shared gating predicate: can this user read gated content for this trail?
+// Covers admin/contributor, lifetime members, non-expired yearly members,
+// and one-off trail purchases.
+const canAccessGated = (req: any, doc: any): boolean => {
   const user = req.user
   if (!user) return false
-
   const role = user.role as string
-
-  // Admins and contributors always have access
   if (role === 'admin' || role === 'contributor') return true
-
-  // Lifetime members always have access
   if (role === 'lifetime') return true
-
-  // Yearly members: check expiry
   if (role === 'yearly') {
     const expiresAt = user.membershipExpiresAt as string | undefined
     if (!expiresAt) return false
     return new Date(expiresAt) > new Date()
   }
-
-  // Check individual trail purchase
   if (doc?.id && Array.isArray(user.trailPurchases)) {
     return user.trailPurchases.some(
       (t: any) => (typeof t === 'object' ? t.id : t) === doc.id,
     )
   }
-
   return false
 }
+
+const isEditor = (req: any): boolean => {
+  const role = req.user?.role
+  return role === 'admin' || role === 'contributor'
+}
+
+const canReadGatedField: FieldAccess = ({ req, doc }) => canAccessGated(req, doc)
+
+const slugify = (input: string): string =>
+  input
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 
 export const Trails: CollectionConfig = {
   slug: 'trails',
@@ -125,7 +131,7 @@ export const Trails: CollectionConfig = {
       ],
     },
     {
-      name: 'photos',
+      name: 'gallery',
       type: 'array',
       fields: [
         {
@@ -133,6 +139,10 @@ export const Trails: CollectionConfig = {
           type: 'upload',
           relationTo: 'media',
           required: true,
+        },
+        {
+          name: 'caption',
+          type: 'text',
         },
       ],
     },
@@ -145,26 +155,6 @@ export const Trails: CollectionConfig = {
       admin: {
         position: 'sidebar',
         allowCreate: true,
-      },
-    },
-    {
-      name: 'gps',
-      type: 'text',
-      access: {
-        read: canReadGatedField,
-      },
-      admin: {
-        description: 'Trailhead GPS coordinates as "lat,lng" (e.g. 12.9716,77.5946)',
-      },
-    },
-    {
-      name: 'distanceFromBangalore',
-      type: 'number',
-      admin: {
-        description:
-          'Straight-line distance from Bangalore centre (Cubbon Park) to trailhead in km. Auto-calculated — do not edit manually.',
-        readOnly: true,
-        position: 'sidebar',
       },
     },
     {
@@ -188,27 +178,6 @@ export const Trails: CollectionConfig = {
       max: 5,
     },
     {
-      name: 'length',
-      type: 'number',
-      admin: {
-        description: 'Trail length in km',
-      },
-    },
-    {
-      name: 'elevationGain',
-      type: 'number',
-      admin: {
-        description: 'Elevation gain in meters',
-      },
-    },
-    {
-      name: 'elevation',
-      type: 'number',
-      admin: {
-        description: 'Peak elevation in meters',
-      },
-    },
-    {
       name: 'difficulty',
       type: 'select',
       options: DIFFICULTY_OPTIONS.map((d) => ({ label: d, value: d })),
@@ -222,51 +191,82 @@ export const Trails: CollectionConfig = {
       options: ACCESS_OPTIONS.map((a) => ({ label: a, value: a })),
     },
 
-    // Driving
+    // Auto-calculated stats — populated by the beforeChange hook from gpxFile.
+    // Grouped in a collapsed panel so editors see them but don't mistake them for manual input.
     {
-      name: 'drivingDistance',
-      type: 'number',
-      admin: {
-        description: 'Driving distance in km',
-      },
-    },
-    {
-      name: 'drivingDistanceText',
-      type: 'text',
-    },
-    {
-      name: 'drivingTime',
-      type: 'number',
-      admin: {
-        description: 'Driving time in minutes',
-      },
-    },
-    {
-      name: 'drivingTimeText',
-      type: 'text',
-    },
-
-    // Hiking
-    {
-      name: 'hikingTime',
-      type: 'number',
-      admin: {
-        description: 'Hiking time in minutes',
-      },
-    },
-    {
-      name: 'hikingTimeWithRests',
-      type: 'number',
-      admin: {
-        description: 'Hiking time with rests in minutes',
-      },
-    },
-    {
-      name: 'hikingTimeWithExploration',
-      type: 'number',
-      admin: {
-        description: 'Hiking time with exploration in minutes',
-      },
+      type: 'collapsible',
+      label: 'Auto-calculated (from GPX)',
+      admin: { initCollapsed: true },
+      fields: [
+        {
+          name: 'gps',
+          type: 'text',
+          access: { read: canReadGatedField },
+          admin: {
+            description: 'Trailhead GPS as "lat,lng". Auto-populated from GPX.',
+            readOnly: true,
+          },
+        },
+        {
+          name: 'distanceFromBangalore',
+          type: 'number',
+          admin: {
+            description:
+              'Shortest road distance from Cubbon Park to trailhead (km) via HERE (routingMode=short); falls back to straight-line if HERE is unavailable.',
+            readOnly: true,
+          },
+        },
+        {
+          name: 'length',
+          type: 'number',
+          admin: { description: 'Trail length in km', readOnly: true },
+        },
+        {
+          name: 'elevationGain',
+          type: 'number',
+          admin: { description: 'Elevation gain in meters', readOnly: true },
+        },
+        {
+          name: 'elevation',
+          type: 'number',
+          admin: { description: 'Peak elevation in meters', readOnly: true },
+        },
+        {
+          name: 'drivingDistance',
+          type: 'number',
+          admin: { description: 'Driving distance in km', readOnly: true },
+        },
+        {
+          name: 'drivingDistanceText',
+          type: 'text',
+          admin: { readOnly: true },
+        },
+        {
+          name: 'drivingTime',
+          type: 'number',
+          admin: { description: 'Driving time in minutes', readOnly: true },
+        },
+        {
+          name: 'drivingTimeText',
+          type: 'text',
+          admin: { readOnly: true },
+        },
+        {
+          name: 'hikingTime',
+          type: 'number',
+          admin: { description: 'Hiking time in minutes (Naismith base)', readOnly: true },
+        },
+        {
+          name: 'hikingTimeWithRests',
+          type: 'number',
+          admin: { description: 'Hiking time with rests (2x base)', readOnly: true },
+        },
+        {
+          name: 'hikingTimeWithExploration',
+          type: 'number',
+          admin: { description: 'Hiking time with rests + exploration (3x base)', readOnly: true },
+        },
+      ],
     },
 
     // Gated — only visible to authenticated users
@@ -292,14 +292,103 @@ export const Trails: CollectionConfig = {
       },
     },
 
-    // Content - plain markdown, NOT Lexical rich text
+    // Legacy content — single markdown blob. Kept during Phase A migration;
+    // the web app prefers `sections` when non-empty. Dropped after the port
+    // lands in prod (see docs/content-sections-plan.md §6).
     {
       name: 'content',
       type: 'textarea',
       admin: {
-        description: 'Trail description in markdown',
+        description: 'Legacy. Use Sections below instead.',
       },
     },
+
+    // Structured sections. Each row is one section of the trail page,
+    // optionally gated to members. See docs/content-sections-plan.md §2.
+    {
+      name: 'sections',
+      type: 'array',
+      labels: { singular: 'Section', plural: 'Sections' },
+      admin: {
+        description: 'Ordered sections rendered on the trail page.',
+      },
+      fields: [
+        {
+          name: 'heading',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'slug',
+          type: 'text',
+          required: true,
+          admin: {
+            description:
+              'Anchor id. Auto-derived from the heading; editable. Must be unique within this trail.',
+          },
+        },
+        {
+          name: 'visibility',
+          type: 'select',
+          required: true,
+          defaultValue: 'public',
+          options: [
+            { label: 'Public', value: 'public' },
+            { label: 'Members only', value: 'members' },
+          ],
+        },
+        {
+          name: 'published',
+          type: 'checkbox',
+          defaultValue: true,
+          admin: {
+            description:
+              'Uncheck to hide this section from the site. Editors still see it.',
+          },
+        },
+        {
+          name: 'body',
+          type: 'textarea',
+          admin: {
+            description: 'Section body in markdown.',
+          },
+        },
+        {
+          name: 'attachments',
+          type: 'array',
+          admin: {
+            description: 'Downloadable files attached to this section.',
+          },
+          fields: [
+            {
+              name: 'file',
+              type: 'upload',
+              relationTo: ['gpx-files', 'media'],
+              required: true,
+            },
+            {
+              name: 'label',
+              type: 'text',
+            },
+          ],
+        },
+        {
+          // Stable id stamped by the port script. Used as the upsert key so
+          // editors renaming a heading in the CMS doesn't cause duplicates
+          // on re-run. Editor-authored sections have this empty.
+          name: 'sourceRef',
+          type: 'text',
+          admin: {
+            readOnly: true,
+            description: 'Migration source id. Do not edit.',
+          },
+        },
+      ],
+    },
+
+    // Gallery — replaces the old `photos` array. One gallery per trail.
+    // Rendered on the detail page as a view-transitions grid.
+    // (Kept here near `sections` so editors see it as related content.)
 
     // Status
     {
@@ -317,6 +406,98 @@ export const Trails: CollectionConfig = {
     },
   ],
   hooks: {
+    beforeValidate: [
+      // Trail-level slug: auto-derive from altName (or title as fallback) so
+      // editors never have to type it. Final canonical form is
+      // `<id>-<slugified-altName>` — the id prefix is stamped in afterChange
+      // on create, since `id` doesn't exist until after the row is inserted.
+      // Existing `<id>-...` slugs are preserved untouched (so editors can
+      // rename altName without breaking URLs).
+      ({ data, originalDoc }) => {
+        if (!data) return data
+        const currentSlug = data.slug?.trim?.()
+        const hasIdPrefix = currentSlug && /^\d+-/.test(currentSlug)
+        if (hasIdPrefix) return data
+
+        const base = slugify(data.altName || data.title || '') || `trail-${originalDoc?.githubIssueNumber ?? 'new'}`
+        // If we already have a numeric id (update), bake it in right here;
+        // otherwise leave the bare slug and let afterChange finalize on create.
+        if (originalDoc?.id != null) {
+          data.slug = `${originalDoc.id}-${base}`
+        } else {
+          data.slug = base
+        }
+        return data
+      },
+      // Auto-populate & de-duplicate section slugs within a trail.
+      // Runs before Payload validates `sections[].slug` (required), so empty
+      // slugs get derived from the heading. Duplicates (editor-authored or
+      // derived collisions) are resolved deterministically with -2/-3… suffixes.
+      ({ data }) => {
+        if (!data || !Array.isArray(data.sections)) return data
+        const seen = new Set<string>()
+        data.sections = data.sections.map((section: any) => {
+          const desired = (section?.slug && String(section.slug).trim()) || slugify(section?.heading || '') || 'section'
+          let candidate = desired
+          let i = 2
+          while (seen.has(candidate)) {
+            candidate = `${desired}-${i}`
+            i++
+          }
+          seen.add(candidate)
+          return { ...section, slug: candidate }
+        })
+        return data
+      },
+    ],
+    afterChange: [
+      // Finalize the trail slug with the id prefix after create.
+      // We can't do this in beforeValidate because id doesn't exist pre-insert.
+      async ({ doc, operation, req, previousDoc }) => {
+        if (operation !== 'create') return doc
+        const current = doc?.slug as string | undefined
+        if (!current) return doc
+        if (/^\d+-/.test(current)) return doc // already canonicalized
+
+        const canonical = `${doc.id}-${current}`
+        try {
+          await req.payload.update({
+            collection: 'trails',
+            id: doc.id,
+            data: { slug: canonical },
+          })
+          doc.slug = canonical
+        } catch (err) {
+          req.payload.logger.warn(
+            { err, trailId: doc.id },
+            'Trail slug canonicalization (id prefix) failed',
+          )
+        }
+        void previousDoc
+        return doc
+      },
+    ],
+    afterRead: [
+      // Row-level gating for `sections`. Payload's field-access runs on the
+      // whole field, not per-row — so we strip rows here instead.
+      //   - published === false → drop row entirely for non-editors
+      //   - visibility === 'members' & not entitled → wipe body + attachments,
+      //     leave heading/slug so the TOC still renders a locked stub
+      ({ doc, req }) => {
+        if (!doc || !Array.isArray(doc.sections)) return doc
+        if (isEditor(req)) return doc
+        const entitled = canAccessGated(req, doc)
+        doc.sections = doc.sections
+          .filter((s: any) => s?.published !== false)
+          .map((s: any) => {
+            if (s?.visibility === 'members' && !entitled) {
+              return { ...s, body: null, attachments: [] }
+            }
+            return s
+          })
+        return doc
+      },
+    ],
     beforeChange: [
       async ({ data, originalDoc, req }) => {
         const gpxFileId =
@@ -327,11 +508,45 @@ export const Trails: CollectionConfig = {
             : originalDoc?.gpxFile
 
         const gpxChanged = gpxFileId && gpxFileId !== prevGpxFileId
+
+        // Two recalc modes:
+        //   - gpxChanged   → overwrite all derived fields with stats from the new GPX
+        //   - !gpxChanged  → fill only the fields that are currently empty (clearing
+        //                    any auto-calc field in the DB / via API triggers a refill
+        //                    on the next save from the current GPX)
+        const merged = { ...(originalDoc ?? {}), ...data }
+        const derivedKeys = [
+          'gps',
+          'length',
+          'elevationGain',
+          'elevation',
+          'hikingTime',
+          'hikingTimeWithRests',
+          'hikingTimeWithExploration',
+          'distanceFromBangalore',
+          'drivingDistance',
+          'drivingDistanceText',
+          'drivingTime',
+          'drivingTimeText',
+          'relativeLocation',
+        ] as const
+        const hasMissingDerived = derivedKeys.some((k) => {
+          const v = (merged as Record<string, unknown>)[k]
+          return v === null || v === undefined || v === ''
+        })
+
         const gpsChanged = data.gps && data.gps !== originalDoc?.gps
+
+        // On gpxChanged, force-write every derived field; otherwise gate on emptiness.
+        const shouldWrite = (key: (typeof derivedKeys)[number]): boolean => {
+          if (gpxChanged) return true
+          const v = (merged as Record<string, unknown>)[key]
+          return v === null || v === undefined || v === ''
+        }
 
         let trailhead: { lat: number; lng: number } | null = null
 
-        if (gpxChanged) {
+        if (gpxFileId && (gpxChanged || hasMissingDerived)) {
           try {
             const media = await req.payload.findByID({
               collection: 'gpx-files',
@@ -345,19 +560,21 @@ export const Trails: CollectionConfig = {
               const gpxContent = await fetch(absUrl).then((r) => r.text())
               trailhead = extractTrailheadFromGpx(gpxContent)
 
-              // Back-fill gps field from GPX trailhead (only if not manually set)
-              if (trailhead && !data.gps) {
+              if (trailhead && shouldWrite('gps')) {
                 data.gps = `${trailhead.lat},${trailhead.lng}`
               }
 
-              // Auto-fill hiking stats (only if not manually set)
               const stats = parseGpxStats(gpxContent)
               if (stats) {
-                if (!data.length) data.length = stats.length
-                if (!data.elevationGain) data.elevationGain = stats.elevationGain
-                if (!data.elevation && stats.peakElevation !== null) data.elevation = stats.peakElevation
-                if (!data.hikingTime) data.hikingTime = stats.hikingTime
-                if (!data.hikingTimeWithRests) data.hikingTimeWithRests = stats.hikingTimeWithRests
+                if (shouldWrite('length')) data.length = stats.length
+                if (shouldWrite('elevationGain')) data.elevationGain = stats.elevationGain
+                if (shouldWrite('elevation') && stats.peakElevation !== null)
+                  data.elevation = stats.peakElevation
+                if (shouldWrite('hikingTime')) data.hikingTime = stats.hikingTime
+                if (shouldWrite('hikingTimeWithRests'))
+                  data.hikingTimeWithRests = stats.hikingTimeWithRests
+                if (shouldWrite('hikingTimeWithExploration'))
+                  data.hikingTimeWithExploration = stats.hikingTimeWithExploration
                 req.payload.logger.info(
                   { stats },
                   `GPX stats: ${stats.length}km, +${stats.elevationGain}m, ~${stats.hikingTime}min`,
@@ -367,23 +584,56 @@ export const Trails: CollectionConfig = {
           } catch (err) {
             req.payload.logger.error({ err }, 'Failed to parse GPX file')
           }
-        } else if (gpsChanged) {
-          trailhead = parseGpsField(data.gps)
+        } else {
+          // Fall back to the gps text field — either explicitly changed in
+          // this save, or already set and we're missing derived fields that
+          // a trailhead can fill (e.g. relativeLocation on a trail saved
+          // before this field was auto-populated).
+          const effectiveGps =
+            (data.gps as string | undefined) ?? (originalDoc?.gps as string | undefined)
+          if (effectiveGps && (gpsChanged || hasMissingDerived)) {
+            trailhead = parseGpsField(effectiveGps)
+          }
         }
 
         if (trailhead) {
-          data.distanceFromBangalore = distanceFromBangaloreCenter(trailhead)
-
-          try {
-            const driving = await getDrivingInfoFromBangalore(trailhead)
-            if (driving) {
-              data.drivingDistance = driving.drivingDistance
-              data.drivingDistanceText = driving.drivingDistanceText
-              data.drivingTime = driving.drivingTime
-              data.drivingTimeText = driving.drivingTimeText
+          const needsFastRoute =
+            shouldWrite('drivingDistance') ||
+            shouldWrite('drivingTime') ||
+            shouldWrite('drivingDistanceText') ||
+            shouldWrite('drivingTimeText')
+          if (needsFastRoute) {
+            try {
+              const driving = await getDrivingInfoFromBangalore(trailhead)
+              if (driving) {
+                if (shouldWrite('drivingDistance')) data.drivingDistance = driving.drivingDistance
+                if (shouldWrite('drivingDistanceText'))
+                  data.drivingDistanceText = driving.drivingDistanceText
+                if (shouldWrite('drivingTime')) data.drivingTime = driving.drivingTime
+                if (shouldWrite('drivingTimeText')) data.drivingTimeText = driving.drivingTimeText
+              }
+            } catch (err) {
+              req.payload.logger.error({ err }, 'HERE Routing API (fast) call failed')
             }
-          } catch (err) {
-            req.payload.logger.error({ err }, 'HERE Routing API call failed')
+          }
+
+          // distanceFromBangalore = shortest road distance (HERE routingMode=short),
+          // fall back to straight-line Haversine when HERE is unavailable.
+          if (shouldWrite('distanceFromBangalore')) {
+            let shortest: number | null = null
+            try {
+              shortest = await getShortestRoadDistanceFromBangalore(trailhead)
+            } catch (err) {
+              req.payload.logger.error({ err }, 'HERE Routing API (short) call failed')
+            }
+            data.distanceFromBangalore = shortest ?? distanceFromBangaloreCenter(trailhead)
+          }
+
+          // relativeLocation = 8-point compass from Bangalore center
+          // (north / northeast / east / …). Pure function, no network call.
+          if (shouldWrite('relativeLocation')) {
+            const compass = getRelativeLocationFromBangalore(trailhead)
+            if (compass) data.relativeLocation = compass
           }
         }
 
