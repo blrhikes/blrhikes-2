@@ -53,6 +53,6 @@ docs/           You are here
 ```bash
 pnpm install
 pnpm dev:cms    # PayloadCMS at localhost:3000
-pnpm dev:fe     # Frontend at localhost:5173
+pnpm dev:web    # Frontend at localhost:5173
 pnpm migrate    # Migrate trail data from GitHub Issues
 ```

@@ -43,7 +43,7 @@ pnpm install
 pnpm dev:cms        # → http://localhost:3000
 
 # Start frontend
-pnpm dev:fe         # → http://localhost:5173
+pnpm dev:web        # → http://localhost:5173
 ```
 
 ## Available Scripts
@@ -51,9 +51,9 @@ pnpm dev:fe         # → http://localhost:5173
 | Script | Description |
 |--------|-------------|
 | `pnpm dev:cms` | Start CMS dev server |
-| `pnpm dev:fe` | Start frontend dev server |
+| `pnpm dev:web` | Start frontend dev server |
 | `pnpm build:cms` | Build CMS for production |
-| `pnpm build:fe` | Build frontend for production |
+| `pnpm build:web` | Build frontend for production |
 | `pnpm migrate` | Run Payload database migrations |
 | `pnpm seed` | Seed trails from GitHub Issues |
 | `pnpm seed:gpx` | Upload & seed GPX files |
