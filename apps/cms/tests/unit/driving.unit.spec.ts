@@ -68,7 +68,7 @@ describe('getDrivingInfoFromBangalore', () => {
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ routes: [] }),
+      json: async () => ({ routes: [] as unknown[] }),
     } as Response)
 
     const result = await getDrivingInfoFromBangalore({ lat: 12.7266, lng: 77.2810 })

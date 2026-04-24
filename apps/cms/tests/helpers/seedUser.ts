@@ -4,6 +4,10 @@ import config from '../../src/payload.config.js'
 export const testUser = {
   email: 'dev@payloadcms.com',
   password: 'test',
+  // `role` is required on the Users collection (default 'lifetime' is a
+  // runtime default — the type still requires it). The beforeChange hook
+  // overrides this to 'admin' for the very first user anyway.
+  role: 'lifetime' as const,
 }
 
 /**
@@ -22,7 +26,7 @@ export async function seedTestUser(): Promise<void> {
     },
   })
 
-  // Create fresh test user
+  // Create fresh test user.
   await payload.create({
     collection: 'users',
     data: testUser,
