@@ -86,6 +86,42 @@
           "notNull": true,
           "autoincrement": false
         },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'lifetime'"
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "first_name": {
+          "name": "first_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "membership_expires_at": {
+          "name": "membership_expires_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_source": {
+          "name": "payment_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "updated_at": {
           "name": "updated_at",
           "type": "text",
@@ -202,6 +238,107 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "users_rels": {
+      "name": "users_rels",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order": {
+          "name": "order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "path": {
+          "name": "path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "trails_id": {
+          "name": "trails_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "users_rels_order_idx": {
+          "name": "users_rels_order_idx",
+          "columns": [
+            "order"
+          ],
+          "isUnique": false
+        },
+        "users_rels_parent_idx": {
+          "name": "users_rels_parent_idx",
+          "columns": [
+            "parent_id"
+          ],
+          "isUnique": false
+        },
+        "users_rels_path_idx": {
+          "name": "users_rels_path_idx",
+          "columns": [
+            "path"
+          ],
+          "isUnique": false
+        },
+        "users_rels_trails_id_idx": {
+          "name": "users_rels_trails_id_idx",
+          "columns": [
+            "trails_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "users_rels_parent_fk": {
+          "name": "users_rels_parent_fk",
+          "tableFrom": "users_rels",
+          "tableTo": "users",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "users_rels_trails_fk": {
+          "name": "users_rels_trails_fk",
+          "tableFrom": "users_rels",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "trails_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "media": {
       "name": "media",
       "columns": {
@@ -302,6 +439,110 @@
         },
         "media_filename_idx": {
           "name": "media_filename_idx",
+          "columns": [
+            "filename"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "gpx_files": {
+      "name": "gpx_files",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "thumbnail_u_r_l": {
+          "name": "thumbnail_u_r_l",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "filename": {
+          "name": "filename",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "filesize": {
+          "name": "filesize",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "width": {
+          "name": "width",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "height": {
+          "name": "height",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "gpx_files_updated_at_idx": {
+          "name": "gpx_files_updated_at_idx",
+          "columns": [
+            "updated_at"
+          ],
+          "isUnique": false
+        },
+        "gpx_files_created_at_idx": {
+          "name": "gpx_files_created_at_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "gpx_files_filename_idx": {
+          "name": "gpx_files_filename_idx",
           "columns": [
             "filename"
           ],
@@ -437,8 +678,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "trails_photos": {
-      "name": "trails_photos",
+    "trails_gallery": {
+      "name": "trails_gallery",
       "columns": {
         "_order": {
           "name": "_order",
@@ -467,25 +708,32 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "caption": {
+          "name": "caption",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "trails_photos_order_idx": {
-          "name": "trails_photos_order_idx",
+        "trails_gallery_order_idx": {
+          "name": "trails_gallery_order_idx",
           "columns": [
             "_order"
           ],
           "isUnique": false
         },
-        "trails_photos_parent_id_idx": {
-          "name": "trails_photos_parent_id_idx",
+        "trails_gallery_parent_id_idx": {
+          "name": "trails_gallery_parent_id_idx",
           "columns": [
             "_parent_id"
           ],
           "isUnique": false
         },
-        "trails_photos_image_idx": {
-          "name": "trails_photos_image_idx",
+        "trails_gallery_image_idx": {
+          "name": "trails_gallery_image_idx",
           "columns": [
             "image_id"
           ],
@@ -493,9 +741,9 @@
         }
       },
       "foreignKeys": {
-        "trails_photos_image_id_media_id_fk": {
-          "name": "trails_photos_image_id_media_id_fk",
-          "tableFrom": "trails_photos",
+        "trails_gallery_image_id_media_id_fk": {
+          "name": "trails_gallery_image_id_media_id_fk",
+          "tableFrom": "trails_gallery",
           "tableTo": "media",
           "columnsFrom": [
             "image_id"
@@ -506,9 +754,180 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "trails_photos_parent_id_fk": {
-          "name": "trails_photos_parent_id_fk",
-          "tableFrom": "trails_photos",
+        "trails_gallery_parent_id_fk": {
+          "name": "trails_gallery_parent_id_fk",
+          "tableFrom": "trails_gallery",
+          "tableTo": "trails",
+          "columnsFrom": [
+            "_parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "trails_sections_attachments": {
+      "name": "trails_sections_attachments",
+      "columns": {
+        "_order": {
+          "name": "_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "_parent_id": {
+          "name": "_parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "trails_sections_attachments_order_idx": {
+          "name": "trails_sections_attachments_order_idx",
+          "columns": [
+            "_order"
+          ],
+          "isUnique": false
+        },
+        "trails_sections_attachments_parent_id_idx": {
+          "name": "trails_sections_attachments_parent_id_idx",
+          "columns": [
+            "_parent_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "trails_sections_attachments_parent_id_fk": {
+          "name": "trails_sections_attachments_parent_id_fk",
+          "tableFrom": "trails_sections_attachments",
+          "tableTo": "trails_sections",
+          "columnsFrom": [
+            "_parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "trails_sections": {
+      "name": "trails_sections",
+      "columns": {
+        "_order": {
+          "name": "_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "_parent_id": {
+          "name": "_parent_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "heading": {
+          "name": "heading",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'public'"
+        },
+        "published": {
+          "name": "published",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_ref": {
+          "name": "source_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "trails_sections_order_idx": {
+          "name": "trails_sections_order_idx",
+          "columns": [
+            "_order"
+          ],
+          "isUnique": false
+        },
+        "trails_sections_parent_id_idx": {
+          "name": "trails_sections_parent_id_idx",
+          "columns": [
+            "_parent_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "trails_sections_parent_id_fk": {
+          "name": "trails_sections_parent_id_fk",
+          "tableFrom": "trails_sections",
           "tableTo": "trails",
           "columnsFrom": [
             "_parent_id"
@@ -562,8 +981,23 @@
           "notNull": false,
           "autoincrement": false
         },
-        "cover_image_id": {
-          "name": "cover_image_id",
+        "cover_image_type": {
+          "name": "cover_image_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'url'"
+        },
+        "cover_image_url": {
+          "name": "cover_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cover_image_image_id": {
+          "name": "cover_image_image_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -576,13 +1010,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "gps": {
-          "name": "gps",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "relative_location": {
           "name": "relative_location",
           "type": "text",
@@ -590,16 +1017,36 @@
           "notNull": false,
           "autoincrement": false
         },
-        "is_local": {
-          "name": "is_local",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": false
-        },
         "rating": {
           "name": "rating",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "difficulty": {
+          "name": "difficulty",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "access": {
+          "name": "access",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "gps": {
+          "name": "gps",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "distance_from_bangalore": {
+          "name": "distance_from_bangalore",
           "type": "numeric",
           "primaryKey": false,
           "notNull": false,
@@ -622,20 +1069,6 @@
         "elevation": {
           "name": "elevation",
           "type": "numeric",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "difficulty": {
-          "name": "difficulty",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "access": {
-          "name": "access",
-          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -696,6 +1129,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "gpx_file_id": {
+          "name": "gpx_file_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "content": {
           "name": "content",
           "type": "text",
@@ -743,10 +1183,10 @@
           ],
           "isUnique": true
         },
-        "trails_cover_image_idx": {
-          "name": "trails_cover_image_idx",
+        "trails_cover_image_cover_image_image_idx": {
+          "name": "trails_cover_image_cover_image_image_idx",
           "columns": [
-            "cover_image_id"
+            "cover_image_image_id"
           ],
           "isUnique": false
         },
@@ -754,6 +1194,13 @@
           "name": "trails_area_idx",
           "columns": [
             "area_id"
+          ],
+          "isUnique": false
+        },
+        "trails_gpx_file_idx": {
+          "name": "trails_gpx_file_idx",
+          "columns": [
+            "gpx_file_id"
           ],
           "isUnique": false
         },
@@ -773,12 +1220,12 @@
         }
       },
       "foreignKeys": {
-        "trails_cover_image_id_media_id_fk": {
-          "name": "trails_cover_image_id_media_id_fk",
+        "trails_cover_image_image_id_media_id_fk": {
+          "name": "trails_cover_image_image_id_media_id_fk",
           "tableFrom": "trails",
           "tableTo": "media",
           "columnsFrom": [
-            "cover_image_id"
+            "cover_image_image_id"
           ],
           "columnsTo": [
             "id"
@@ -792,6 +1239,19 @@
           "tableTo": "areas",
           "columnsFrom": [
             "area_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "trails_gpx_file_id_gpx_files_id_fk": {
+          "name": "trails_gpx_file_id_gpx_files_id_fk",
+          "tableFrom": "trails",
+          "tableTo": "gpx_files",
+          "columnsFrom": [
+            "gpx_file_id"
           ],
           "columnsTo": [
             "id"
@@ -841,6 +1301,20 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "gpx_files_id": {
+          "name": "gpx_files_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "media_id": {
+          "name": "media_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -871,6 +1345,20 @@
             "highlights_id"
           ],
           "isUnique": false
+        },
+        "trails_rels_gpx_files_id_idx": {
+          "name": "trails_rels_gpx_files_id_idx",
+          "columns": [
+            "gpx_files_id"
+          ],
+          "isUnique": false
+        },
+        "trails_rels_media_id_idx": {
+          "name": "trails_rels_media_id_idx",
+          "columns": [
+            "media_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -893,6 +1381,32 @@
           "tableTo": "highlights",
           "columnsFrom": [
             "highlights_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trails_rels_gpx_files_fk": {
+          "name": "trails_rels_gpx_files_fk",
+          "tableFrom": "trails_rels",
+          "tableTo": "gpx_files",
+          "columnsFrom": [
+            "gpx_files_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "trails_rels_media_fk": {
+          "name": "trails_rels_media_fk",
+          "tableFrom": "trails_rels",
+          "tableTo": "media",
+          "columnsFrom": [
+            "media_id"
           ],
           "columnsTo": [
             "id"
@@ -1051,6 +1565,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "gpx_files_id": {
+          "name": "gpx_files_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "areas_id": {
           "name": "areas_id",
           "type": "integer",
@@ -1109,6 +1630,13 @@
           ],
           "isUnique": false
         },
+        "payload_locked_documents_rels_gpx_files_id_idx": {
+          "name": "payload_locked_documents_rels_gpx_files_id_idx",
+          "columns": [
+            "gpx_files_id"
+          ],
+          "isUnique": false
+        },
         "payload_locked_documents_rels_areas_id_idx": {
           "name": "payload_locked_documents_rels_areas_id_idx",
           "columns": [
@@ -1164,6 +1692,19 @@
           "tableTo": "media",
           "columnsFrom": [
             "media_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "payload_locked_documents_rels_gpx_files_fk": {
+          "name": "payload_locked_documents_rels_gpx_files_fk",
+          "tableFrom": "payload_locked_documents_rels",
+          "tableTo": "gpx_files",
+          "columnsFrom": [
+            "gpx_files_id"
           ],
           "columnsTo": [
             "id"
@@ -1457,6 +1998,6 @@
   "internal": {
     "indexes": {}
   },
-  "id": "57ef74b2-2a60-4ccd-998d-af7894eba9c4",
+  "id": "c1a1b4a2-2529-4223-a27c-726866f3d40b",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
