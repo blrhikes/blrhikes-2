@@ -1,43 +1,32 @@
-/**
- * For more details on how to configure Wrangler, refer to:
- * https://developers.cloudflare.com/workers/wrangler/configuration/
- */
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "blrhikes-fe",
-	"compatibility_date": "2025-04-04",
-	"main": "./workers/app.ts",
-	// Local dev defaults. For production, override these in the
-	// Cloudflare dashboard: Settings > Variables & Secrets.
-	// Dashboard vars take precedence over these at runtime.
-	"vars": {
-		"CMS_URL": "http://localhost:3000"
-	},
-	"observability": {
-		"enabled": true
-	},
-	"compatibility_flags": [
-		"nodejs_compat"
-	]
-	/**
-	 * Smart Placement
-	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
-	 */
-	// "placement": {  "mode": "smart" }
-	/**
-	 * Bindings
-	 * Bindings allow your Worker to interact with resources on the Cloudflare Developer Platform, including
-	 * databases, object storage, AI inference, real-time communication and more.
-	 * https://developers.cloudflare.com/workers/runtime-apis/bindings/
-	 */
-	/**
-	 * Static Assets
-	 * https://developers.cloudflare.com/workers/static-assets/binding/
-	 */
-	// "assets": {  "directory": "./public/",  "binding": "ASSETS" }
-	/**
-	 * Service Bindings (communicate between multiple Workers)
-	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
-	 */
-	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": "./workers/app.ts",
+  "account_id": "<YOUR_CLOUDFLARE_ACCOUNT_ID>",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  // Top-level has no bindings/vars/routes by design (washi pattern). Every
+  // deploy must pick an env explicitly with `--env=<name>`. Local dev uses
+  // `react-router dev` (Vite) and does not go through wrangler — CMS URL
+  // for dev is set via .dev.vars / .env, not here.
+  "env": {
+    // Remote pre-prod. test.blrhikes.in.
+    "test": {
+      "name": "blrhikes-web-test",
+      "vars": {
+        "CMS_URL": "https://cms-test.blrhikes.in"
+      },
+      "routes": [{ "pattern": "test.blrhikes.in", "custom_domain": true }]
+    },
+    // Remote prod. blrhikes.in.
+    "live": {
+      "name": "blrhikes-web-live",
+      "vars": {
+        "CMS_URL": "https://cms.blrhikes.in"
+      },
+      "routes": [{ "pattern": "blrhikes.in", "custom_domain": true }]
+    }
+  }
 }
