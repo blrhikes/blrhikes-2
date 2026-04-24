@@ -17,3 +17,5 @@ scripts/.cache/
 # Payload generated
 apps/cms/src/payload-types.ts
 apps/cms/src/app/(payload)/importMap.js
+
+ignore/

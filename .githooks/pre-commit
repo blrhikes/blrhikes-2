@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# Check if CMS schema files changed without a corresponding migration file
+
+SCHEMA_PATHS="apps/cms/src/collections/ apps/cms/src/globals/ apps/cms/src/payload.config.ts"
+
+schema_changed=false
+migration_added=false
+
+for path in $SCHEMA_PATHS; do
+  if git diff --cached --name-only | grep -q "^${path}"; then
+    schema_changed=true
+    break
+  fi
+done
+
+if git diff --cached --name-only | grep -q "^apps/cms/src/migrations/"; then
+  migration_added=true
+fi
+
+if [ "$schema_changed" = true ] && [ "$migration_added" = false ]; then
+  echo ""
+  echo "⚠️  Warning: CMS schema files changed but no migration file was added."
+  echo ""
+  echo "   Changed schema files:"
+  git diff --cached --name-only | grep -E "^apps/cms/src/(collections|globals)/|^apps/cms/src/payload.config.ts"
+  echo ""
+  echo "   If this changes the DB schema, run: pnpm --filter cms payload migrate:create"
+  echo "   To skip this check: git commit --no-verify"
+  echo ""
+  exit 1
+fi
