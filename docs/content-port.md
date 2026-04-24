@@ -1,8 +1,22 @@
-# Content Sections — Manual Runbook
+# Content Port — Runbook
 
-Things you need to run by hand to take Phase A from "code merged" to "prod live". The coding is done — this is every command, in order, with checkpoints.
+Operational guide for getting trail content from GitHub Issues into the CMS,
+and re-running the port as the upstream issues evolve.
 
-See `docs/content-sections-plan.md` for the design; this doc is operational.
+**Background**: trail content for v1 of blrhikes.com lives in the
+`shreshthmohan/blrhikes-data` repo as GitHub Issues:
+
+- Issues labeled `trail` + `status:live` are the ~32 active trails.
+- YAML frontmatter in the issue body holds metadata (altName, GPS, difficulty,
+  area, mapLink, etc.); markdown after the frontmatter is the trail content.
+- H2 headings (`## …`) inside the issue body split the content into **public
+  sections**.
+- Separate issue comments with `section:` + `status: live` frontmatter become
+  **members-only sections**. That's the gating axis, period.
+
+The migration pipeline is three scripts, run in order:
+`seed` (trails + legacy content) → `seed:gpx` (GPX files) →
+`seed:sections` (structured sections + members-only gating).
 
 ---
 
@@ -196,56 +210,51 @@ For each of these, pick 2-3 trails and check:
 - [ ] Gallery view-transitions animate on Chrome/Safari. Close + prev/next work.
 - [ ] Eyeball `/api/trails/<slug>` response size — a sections-heavy trail shouldn't balloon past a few hundred KB. If it does, lower `depth` in `fetchTrailBySlug` (`apps/web/app/lib/api.server.ts`).
 
-## 5. Pre-production deploy — generate the migration
+## 5. Schema migration on deploy
 
-Once staging QA passes, generate the real SQL migration for the D1 database:
+Schema is auto-migrated by CF Workers Builds — the CMS `build` script runs
+`payload migrate --disable-confirm` against the remote D1 (test or live
+depending on the `CLOUDFLARE_ENV` build variable) before the Next build.
+If the migration fails, the deploy fails. Schema and code always land
+together.
 
-```bash
-cd apps/cms
-pnpm payload migrate:create add-sections-and-gallery
-```
+No manual `deploy:database` is needed for regular pushes. See
+`docs/migrations.md` for the detailed workflow on writing and testing a
+new migration. See `docs/deploy.md` for the CF configuration.
 
-This:
+## 6. Port data against prod
 
-- Interactively prompts for a migration name (type `add-sections-and-gallery` or whatever fits).
-- Writes a new `apps/cms/src/migrations/<timestamp>_<name>.ts` with the diff'd SQL.
-- Auto-updates `apps/cms/src/migrations/index.ts` — **don't hand-edit either file**.
-
-**Review the generated SQL**. Sanity checks:
-
-- `photos` column/table should be dropped (it's a rename, so D1 handles it as drop + create under the hood — sections of the migration will reflect that).
-- `gallery` table created with `caption`.
-- `sections` table created with `heading`, `slug`, `visibility`, `published`, `body`, `sourceRef`.
-- `sections_attachments` table with the polymorphic relation columns (`file_id`, `file_relation_to`).
-
-If the diff looks wrong, fix the schema (not the migration), re-run `migrate:create`, commit both.
-
-## 6. Prod deploy
+Once the live worker is up and the live D1 has the current schema,
+run the port from your local machine:
 
 ```bash
-# Deploys the migration to D1, then deploys the worker
-cd apps/cms
-pnpm deploy
-```
-
-After deploy, re-run the port script against prod:
-
-```bash
-CMS_URL=https://<prod-cms-url> \
-CMS_API_KEY=<prod-api-key> \
+CMS_URL=https://cms.blrhikes.in \
+CMS_API_KEY=<live-admin-api-key> \
+  pnpm --filter scripts seed      # trails
+CMS_URL=https://cms.blrhikes.in \
+CMS_API_KEY=<live-admin-api-key> \
+  pnpm --filter scripts seed:gpx
+CMS_URL=https://cms.blrhikes.in \
+CMS_API_KEY=<live-admin-api-key> \
   pnpm --filter scripts seed:sections -- --commit
 ```
 
-Check a handful of prod trails.
+The API key is minted per-environment — mint a fresh one on the live
+admin user and keep it out of version control. Check a handful of
+prod trails after.
 
-## 7. Cleanup (follow-up release)
+## 7. Cleanup (follow-up release — legacy `content` / `photos` removal)
 
-Once prod has been running on sections for ~1 release cycle and no rollback is needed:
+The trail collection still carries the legacy `content` textarea and `photos`
+array from before sections/gallery shipped. Once sections have been soaking
+in prod for a cycle and no rollback is needed:
 
-- Remove `content` and `photos` fields from `apps/cms/src/collections/Trails.ts` (and the fallback path in `apps/web/app/routes/trail-detail.tsx`).
+- Remove `content` and `photos` fields from `apps/cms/src/collections/Trails.ts`
+  (and the fallback path in `apps/web/app/routes/trail-detail.tsx` that
+  renders `content` when `sections` is empty).
 - Run `pnpm generate:types:payload`.
-- Run `pnpm payload migrate:create drop-legacy-content` to drop the columns.
-- Deploy.
+- Run `pnpm migrate:create` to generate a drop-columns migration.
+- Push — CF build applies it on deploy.
 
 ---
 
@@ -283,7 +292,43 @@ Expected: `HTTP 200` and a JSON body with a non-null `"user": { "id": …, "role
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | Port script: "no trail found in CMS" | `migrate.ts` hasn't been run against this CMS | Run `pnpm --filter scripts seed` first |
+| GitHub API 403 | Unauthenticated; rate limit hit | Set `GITHUB_TOKEN` in `.env` (raises limit 60 → 5000/hr) |
 | Sections show raw `{ relationTo: 'gpx-files', value: ... }` in frontend | `api.server.ts` normalization not running | Check `normalizeTrail()` — the sections block should flatten the polymorphic upload |
 | Members-only section body leaking to anonymous users | `afterRead` hook isn't firing on this API path | Test via `/api/graphql` too; the hook runs there as well — if it doesn't, file a payload bug |
 | View Transitions not animating | Firefox (no support) or Safari < 18 | Behavior degrades to a plain nav — acceptable |
 | Duplicate slugs after port | `dedupeSlugs` in both hook and script should prevent this; if you see it, one of the two didn't run | Check Payload logs; hook may have failed validation |
+
+---
+
+## Appendix: image URL rewriting
+
+GitHub user-attachment URLs in the issue bodies get rewritten to the
+Cloudflare CDN URL at port time (same pattern used in v1):
+
+```
+Input:  https://github.com/user-attachments/assets/{uuid}
+Output: https://blrhikes.com/cdn-cgi/image/width=800,quality=80,format=jpeg/https://images.blrhikes.com/{uuid}
+```
+
+The images are already in R2 (proxied from v1) — no download or re-upload
+needed, the URL rewrite is purely cosmetic to route through the CDN +
+Image Resizing. Happens once at port time, not at render time.
+
+## Appendix: how v1 handled this
+
+The original Astro-based site processes markdown at build time via a
+unified / rehype pipeline:
+
+```
+GitHub Issue API
+  → gray-matter (strip frontmatter)
+  → remarkParse → remarkGfm
+  → remarkRehype → rehypeRaw → rehypeSlug
+  → rehypeTransformImageUrls (CDN rewrite)
+  → rehypeLightGallery (group consecutive images)
+  → rehypeExternalLinks (target="_blank")
+  → rehypeStringify → HTML
+```
+
+Key difference: v1 did this every build. v2 does it once at port time
+and stores the result in the CMS.

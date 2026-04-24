@@ -143,15 +143,17 @@ Do this four times — once per entry in the table at the top.
 
 ## 4. Set per-worker secrets
 
-The CMS needs a `PAYLOAD_SECRET` (random 64-char string). Set one per env.
+The CMS needs two required secrets and a couple of optional ones. Set them per env.
 
-Each CMS worker → **Settings → Variables and Secrets → Add**:
+Each CMS worker → **Settings → Variables and Secrets → Add (type: Secret)**:
 
-- `PAYLOAD_SECRET` (type: Secret) → paste `openssl rand -hex 32` output. **Use different secrets for test vs live.**
+- **`PAYLOAD_SECRET`** — random 64-char string from `openssl rand -hex 32`. **Use different secrets for test vs live.** Payload signs JWTs with it; rotating invalidates every active session.
+- **`RESEND_API_KEY`** — from the Resend dashboard. Used for forgot-password and other outbound emails via the adapter at `apps/cms/src/email/resend.ts`.
+  - **Before sends work**, verify the sending domain in Resend (default: `send.blrhikes.in`). Add the SPF + DKIM records Resend prescribes to the `blrhikes.in` DNS zone. Without verification, Resend returns 403.
+  - Optionally override the default from address/name with `RESEND_FROM` / `RESEND_FROM_NAME` secrets.
+- **`HERE_API_KEY`** — optional. Only needed if you want driving distance/time auto-calculated on GPX upload (`apps/cms/src/lib/driving.ts`). Leave unset to have trails skip those stats.
 
-Do the same if any other runtime secret surfaces later (e.g. `HERE_API_KEY` for driving calculations — check `apps/cms/src/lib/driving.ts`).
-
-The Web worker doesn't need secrets for now. `CMS_URL` is already in the `vars` block of wrangler.jsonc and will be set by the deploy.
+The Web worker doesn't need secrets for now. `CMS_URL` is already in the `vars` block of wrangler.jsonc and gets baked in by the deploy.
 
 ### Variables reference — what lives where
 
@@ -175,6 +177,9 @@ Bindings (D1, R2, KV, Service Bindings) are a fourth thing — declared in `wran
 | `WEB_URL` | runtime | plain var | `env.test/live.vars` in `apps/cms/wrangler.jsonc` | Yes |
 | `CMS_URL` | runtime | plain var | same | Yes |
 | `PAYLOAD_SECRET` | runtime | secret | Dashboard → `Variables and Secrets` (different value per env) | Yes |
+| `RESEND_API_KEY` | runtime | secret | Dashboard → `Variables and Secrets` | Yes (for forgot-password + outbound email) |
+| `RESEND_FROM` | runtime | secret (plain ok) | same | Optional — overrides `hello@send.blrhikes.in` default |
+| `RESEND_FROM_NAME` | runtime | secret (plain ok) | same | Optional — overrides `BLR Hikes` default |
 | `HERE_API_KEY` | runtime | secret | Dashboard → `Variables and Secrets` | Only if driving calcs are enabled (`apps/cms/src/lib/driving.ts`) |
 | `D1` binding | runtime | binding | `env.*.d1_databases` in wrangler.jsonc | Yes |
 | `R2` binding | runtime | binding | `env.*.r2_buckets` in wrangler.jsonc | Yes |
