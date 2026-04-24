@@ -2,7 +2,7 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/logout";
 
 export async function action({ context }: Route.ActionArgs) {
-  const cmsUrl = context.cloudflare.env.CMS_URL || "http://localhost:3000";
+  const cmsUrl = context.cmsUrl;
   const isProduction = cmsUrl.includes("blrhikes.com");
 
   const cookieParts = [

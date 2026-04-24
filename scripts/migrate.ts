@@ -14,6 +14,7 @@ const GITHUB_REPO = "shreshthmohan/blrhikes-data";
 const CMS_URL = process.env.CMS_URL || "http://localhost:3000";
 const CMS_API_KEY = process.env.CMS_API_KEY || "";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "";
+
 const FORCE = process.argv.includes("--force");
 const REFRESH = process.argv.includes("--refresh");
 
@@ -51,7 +52,7 @@ interface ParsedTrail {
   area?: string;
   gps?: string;
   relativeLocation?: string;
-  isLocal?: boolean;
+
   highlights?: string[];
   rating?: number;
   length?: number;
@@ -201,15 +202,24 @@ function parseIssue(issue: GitHubIssue): ParsedTrail {
     ? extractCoverImageUrl(`![cover](${frontmatter.coverImage})`)
     : extractCoverImageUrl(issue.body || "");
 
+  const title = frontmatter.title || issue.title;
+  const altName = frontmatter.altName || frontmatter.alt_name;
+  // Slug is derived from altName only (title can be generic — "Nandi Hills" —
+  // altName is the descriptive nickname, which is what ends up in the URL).
+  // The real id prefix (`<trail.id>-...`) is stamped by a second PATCH in
+  // upsertTrail once Payload hands back the created doc's numeric id.
+  // Fallback to title, then to a placeholder, so validation passes at POST time.
+  const slugBase = slugify(altName || title) || `trail-${issue.number}`;
+
   return {
-    title: frontmatter.title || issue.title,
-    slug: slugify(frontmatter.title || issue.title),
+    title,
+    slug: slugBase,
     githubIssueNumber: issue.number,
-    altName: frontmatter.altName || frontmatter.alt_name,
+    altName,
     area: frontmatter.area || "Unknown",
     gps: frontmatter.gps,
     relativeLocation: frontmatter.relativeLocation || frontmatter.relative_location,
-    isLocal: frontmatter.isLocal ?? frontmatter.is_local,
+
     highlights: Array.isArray(frontmatter.highlights)
       ? frontmatter.highlights.map((h: string) => h.toLowerCase().trim())
       : frontmatter.tags
@@ -336,7 +346,7 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     area: areaId,
     gps: trail.gps,
     relativeLocation: trail.relativeLocation,
-    isLocal: trail.isLocal,
+
     highlights: highlightIds,
     rating: trail.rating,
     length: trail.length,
@@ -373,7 +383,7 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {}),
+      ...authHeaders(),
     },
     body: JSON.stringify(body),
   });
@@ -382,6 +392,9 @@ async function upsertTrail(trail: ParsedTrail, existingId?: string): Promise<voi
     const text = await res.text();
     throw new Error(`Failed to ${method} trail "${trail.title}": ${res.status} ${text}`);
   }
+
+  // Slug canonicalization to `<id>-<altName-slug>` is handled server-side
+  // by the Trails collection's afterChange hook. No follow-up PATCH needed here.
 }
 
 // --- Local GitHub data cache ---
@@ -438,10 +451,13 @@ async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
 
 // --- Main ---
 async function main() {
-  console.log(`CMS_URL: ${CMS_URL}`);
-  console.log(`CMS_API_KEY: ${CMS_API_KEY ? CMS_API_KEY.slice(0, 8) + "..." : "(not set)"}`);
+  console.log(`CMS_URL:      ${CMS_URL}`);
+  console.log(`CMS_API_KEY:  ${CMS_API_KEY ? CMS_API_KEY.slice(0, 8) + "..." : "(not set)"}`);
   console.log(`GITHUB_TOKEN: ${GITHUB_TOKEN ? GITHUB_TOKEN.slice(0, 8) + "..." : "(not set)"}`);
-  console.log(`Force mode: ${FORCE ? "ON" : "OFF"}`);
+  console.log(`Force mode:   ${FORCE ? "ON" : "OFF"}`);
+  if (!CMS_API_KEY) {
+    throw new Error("CMS_API_KEY must be set (see docs/content-sections-runbook.md §0)");
+  }
 
   const githubData = await loadOrFetchGitHubData();
 
@@ -455,7 +471,7 @@ async function main() {
       const checkRes = await fetch(
         `${CMS_URL}/api/trails?where[githubIssueNumber][equals]=${issue.number}&limit=1`,
         {
-          headers: CMS_API_KEY ? { Authorization: `users API-Key ${CMS_API_KEY}` } : {},
+          headers: authHeaders(),
         },
       );
       let existingId: string | undefined;

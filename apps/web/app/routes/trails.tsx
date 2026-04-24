@@ -30,7 +30,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     page: url.searchParams.get("page") ? Number(url.searchParams.get("page")) : undefined,
   };
 
-  const data = await fetchTrails(params, context.payloadToken ?? undefined);
+  const data = await fetchTrails(context.cmsUrl, params, context.payloadToken ?? undefined);
   return { trails: data.docs, totalDocs: data.totalDocs, params, user: context.user };
 }
 

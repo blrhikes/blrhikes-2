@@ -6,7 +6,7 @@
 - **CMS:** PayloadCMS (headless, REST API) on Cloudflare Workers
 - **Database:** Cloudflare D1 (SQLite)
 - **Images:** Cloudflare R2 storage + Cloudflare Image Resizing (reused from v1)
-- **Monorepo:** pnpm workspaces — `apps/cms`, `apps/fe`, `packages/shared`, `scripts`
+- **Monorepo:** pnpm workspaces — `apps/cms`, `apps/web`, `packages/shared`, `scripts`
 
 ## Collections (PayloadCMS)
 
@@ -54,7 +54,7 @@ Planned but not yet created: **Payments**, **Events**, **Blog**
 GitHub Issues (shreshthmohan/blrhikes-data)
   → scripts/migrate.ts (ETL: parse frontmatter, rewrite image URLs, upload)
   → PayloadCMS REST API (storage in D1)
-  → apps/fe loader functions (fetch from CMS, normalize)
+  → apps/web loader functions (fetch from CMS, normalize)
   → React components (render)
 ```
 

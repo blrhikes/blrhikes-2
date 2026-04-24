@@ -6,7 +6,7 @@ Task tracker for BLR Hikes v2. Checkboxes = done/not done. Each phase has its ow
 
 ## Phase 1: Foundation
 
-- [x] Project setup — pnpm monorepo with `apps/cms`, `apps/fe`, `packages/shared`
+- [x] Project setup — pnpm monorepo with `apps/cms`, `apps/web`, `packages/shared`
 - [x] PayloadCMS with collections — Trails, Users, Media, Areas, Highlights, GpxFiles
 - [x] Homepage (redirects to /trails for now)
 - [x] Trail listing page with filters (difficulty, highlights, access, area, duration, search)

@@ -1,0 +1,32 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": "./workers/app.ts",
+  "account_id": "<YOUR_CLOUDFLARE_ACCOUNT_ID>",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  // Top-level has no bindings/vars/routes by design (washi pattern). Every
+  // deploy must pick an env explicitly with `--env=<name>`. Local dev uses
+  // `react-router dev` (Vite) and does not go through wrangler — CMS URL
+  // for dev is set via .dev.vars / .env, not here.
+  "env": {
+    // Remote pre-prod. test.blrhikes.in.
+    "test": {
+      "name": "blrhikes-web-test",
+      "vars": {
+        "CMS_URL": "https://cms-test.blrhikes.in"
+      },
+      "routes": [{ "pattern": "test.blrhikes.in", "custom_domain": true }]
+    },
+    // Remote prod. blrhikes.in.
+    "live": {
+      "name": "blrhikes-web-live",
+      "vars": {
+        "CMS_URL": "https://cms.blrhikes.in"
+      },
+      "routes": [{ "pattern": "blrhikes.in", "custom_domain": true }]
+    }
+  }
+}
