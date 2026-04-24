@@ -30,3 +30,40 @@ if [ "$schema_changed" = true ] && [ "$migration_added" = false ]; then
   echo ""
   exit 1
 fi
+
+# ---------------------------------------------------------------------------
+# If a wrangler.jsonc changed, regenerate cloudflare types so the .d.ts
+# stays in sync with the config. Auto-stage the regenerated file so the
+# commit includes it. Skip with `git commit --no-verify` if you've made the
+# config change intentionally without wanting the types refreshed yet.
+# ---------------------------------------------------------------------------
+
+regen_cloudflare_types() {
+  local app="$1"          # "cms" or "web" (directory name under apps/)
+  local filter="$2"       # pnpm filter, e.g. "cms" or "@blrhikes/web"
+  local script="$3"       # package.json script, e.g. "generate:types:cloudflare"
+  local types_file="$4"   # relative path under apps/<app> that wrangler writes to
+
+  echo "ℹ️  apps/$app/wrangler.jsonc changed — regenerating cloudflare types..."
+  if ! pnpm --filter "$filter" run "$script" > /dev/null 2>&1; then
+    echo ""
+    echo "❌ wrangler types failed for $app. Fix the error and re-commit, or"
+    echo "   bypass with: git commit --no-verify"
+    echo ""
+    exit 1
+  fi
+
+  local abs_path="apps/$app/$types_file"
+  if ! git diff --quiet -- "$abs_path" 2>/dev/null; then
+    echo "   auto-staged updated $abs_path"
+    git add -- "$abs_path"
+  fi
+}
+
+if git diff --cached --name-only | grep -q "^apps/cms/wrangler\.jsonc$"; then
+  regen_cloudflare_types cms cms generate:types:cloudflare cloudflare-env.d.ts
+fi
+
+if git diff --cached --name-only | grep -q "^apps/web/wrangler\.jsonc$"; then
+  regen_cloudflare_types web @blrhikes/web cf-typegen worker-configuration.d.ts
+fi
