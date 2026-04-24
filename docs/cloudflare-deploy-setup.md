@@ -131,18 +131,15 @@ Do this four times — once per entry in the table at the top.
    - `test` workers → track a branch like `main` or `backend-v1` (whichever you want to auto-deploy to test from)
    - `live` workers → track `main` (or a `production` tag/branch)
 5. **Build command** (per app):
-   - CMS: `pnpm install --frozen-lockfile && pnpm --filter cms build:cf` *(see note below — you may need to add this script)*
+   - CMS: `pnpm install --frozen-lockfile && pnpm --filter cms build:cf`
    - Web: `pnpm install --frozen-lockfile && pnpm --filter web build`
 6. **Build output directory**: leave as default — wrangler handles it based on `main` in the jsonc.
 7. **Root directory**: `apps/cms` or `apps/web` respectively.
 8. **Wrangler env flag**: under `Settings → Builds`, set the deploy command to `wrangler deploy --env=test` (or `--env=live`). This tells Cloudflare which env block in wrangler.jsonc to use.
-9. **Create & Deploy**. First deploy will likely fail until you set secrets (next step) — that's fine.
+9. **Build-time env var (CMS only)**: under `Settings → Builds → Variables`, set `CLOUDFLARE_ENV=test` on the test worker and `CLOUDFLARE_ENV=live` on the live one. `build:cf` forwards this to `opennextjs-cloudflare build --env=$CLOUDFLARE_ENV` so OpenNext picks up the right env block from wrangler.jsonc.
+10. **Create & Deploy**. First deploy will likely fail until you set secrets (next step) — that's fine.
 
-> **Note on the CMS build command**: the repo currently has `apps/cms/package.json` → `deploy:app` as `opennextjs-cloudflare build … && opennextjs-cloudflare deploy …`. For the CF dashboard flow, we want a **build-only** script (CF does the deploy itself). Add:
-> ```json
-> "build:cf": "opennextjs-cloudflare build --env=$CLOUDFLARE_ENV"
-> ```
-> And set `CLOUDFLARE_ENV` as a build-time environment variable on each CMS worker (test → `test`, live → `live`).
+> **Why `build:cf` and not `build`?** `pnpm --filter cms build` runs `migrate:prod && next build`. The migrate step would try to hit D1 at CF's build-container level (no bindings available there) and fail. `build:cf` is the CF-dashboard-friendly variant: it only runs `opennextjs-cloudflare build`, which packages `.open-next/worker.js`. DB migrations happen separately via `deploy:database` against the deployed worker's bindings (§7).
 
 ## 4. Set per-worker secrets
 
@@ -155,6 +152,43 @@ Each CMS worker → **Settings → Variables and Secrets → Add**:
 Do the same if any other runtime secret surfaces later (e.g. `HERE_API_KEY` for driving calculations — check `apps/cms/src/lib/driving.ts`).
 
 The Web worker doesn't need secrets for now. `CMS_URL` is already in the `vars` block of wrangler.jsonc and will be set by the deploy.
+
+### Variables reference — what lives where
+
+Cloudflare Workers has three distinct "places" a variable can come from, and they're not interchangeable. Getting them mixed up is the #1 way deploys look like they work but the worker misbehaves.
+
+| Source | Set via | Visible at | Contents |
+|--------|---------|------------|----------|
+| **Build-time env** | Dashboard → worker → `Settings → Builds → Variables` | Build container only. **Not** at runtime. | `CLOUDFLARE_ENV` — drives `opennextjs-cloudflare build --env=$…` and any other `$…` expansion in your build command. |
+| **wrangler.jsonc `vars`** | `env.<name>.vars` in `wrangler.jsonc` (committed) | Worker runtime, as `env.FOO` in worker code. Public (anyone can read via bundle inspection / dashboard). | Plain configuration: `CMS_URL`, `WEB_URL`. |
+| **Wrangler secrets** | Dashboard → worker → `Settings → Variables and Secrets → Add (type: Secret)`, or `wrangler secret put FOO --env <env>` | Worker runtime, same `env.FOO` shape. Encrypted at rest. | `PAYLOAD_SECRET`, any API keys (`HERE_API_KEY`, etc.). |
+
+Bindings (D1, R2, KV, Service Bindings) are a fourth thing — declared in `wrangler.jsonc` env blocks, injected into `env` at runtime, never exposed to your code as strings.
+
+#### Per-app cheatsheet
+
+**`apps/cms` CMS worker**
+
+| Variable | Phase | Type | Where set | Required? |
+|----------|-------|------|-----------|-----------|
+| `CLOUDFLARE_ENV` | build | build-env | Dashboard → `Settings → Builds → Variables` — set to `test` or `live` per worker | Yes |
+| `WEB_URL` | runtime | plain var | `env.test/live.vars` in `apps/cms/wrangler.jsonc` | Yes |
+| `CMS_URL` | runtime | plain var | same | Yes |
+| `PAYLOAD_SECRET` | runtime | secret | Dashboard → `Variables and Secrets` (different value per env) | Yes |
+| `HERE_API_KEY` | runtime | secret | Dashboard → `Variables and Secrets` | Only if driving calcs are enabled (`apps/cms/src/lib/driving.ts`) |
+| `D1` binding | runtime | binding | `env.*.d1_databases` in wrangler.jsonc | Yes |
+| `R2` binding | runtime | binding | `env.*.r2_buckets` in wrangler.jsonc | Yes |
+
+**`apps/web` Web worker**
+
+| Variable | Phase | Type | Where set | Required? |
+|----------|-------|------|-----------|-----------|
+| *(none)* | build | — | — | The web build is pure Vite — no build-time env vars needed |
+| `CMS_URL` | runtime | plain var | `env.test/live.vars` in `apps/web/wrangler.jsonc` | Yes |
+
+#### Common gotcha
+
+Do **not** put `CLOUDFLARE_ENV` in wrangler.jsonc `vars` thinking it'll reach the build — `vars` is runtime-only. The build command `build:cf` expands `$CLOUDFLARE_ENV` from the build container's shell, which only gets populated from Dashboard → `Settings → Builds → Variables`.
 
 ## 5. Bind D1 + R2 to the CMS workers
 
@@ -180,7 +214,7 @@ Each worker → **Settings → Domains & Routes → Add Custom Domain**:
 
 First time you add a custom domain for a zone on the same CF account, it's near-instant. DNS propagates within minutes.
 
-## 7. Run the first migration against the prod D1
+## 7. Run the first migration against the remote D1
 
 Once the CMS is deployed to test, you need to run the Payload migration so the schema actually exists in the test D1:
 
@@ -190,9 +224,16 @@ cd apps/cms
 CLOUDFLARE_ENV=test pnpm deploy:database
 ```
 
-This runs `payload migrate` against the remote D1 via the bindings in wrangler.jsonc. Run again with `CLOUDFLARE_ENV=live` after the live worker is up.
+This runs `payload migrate` against the remote D1 via the bindings in wrangler.jsonc, then a `PRAGMA optimize` to keep SQLite happy. Run again with `CLOUDFLARE_ENV=live` after the live worker is up.
 
-Wrangler will use your local CF auth (`wrangler login` first time) — the GitHub integration doesn't migrate the DB, only the worker code.
+Wrangler uses your local CF auth (`wrangler login` once) — the GitHub integration deploys worker code but does not touch the DB.
+
+**Local equivalents** (handy for day-to-day, not used at deploy):
+
+- `pnpm migrate` → `payload migrate` against the local `.wrangler/state/` miniflare D1.
+- `pnpm migrate:create` → generate a new migration file from the schema diff.
+
+Both wrappers prefix `CLOUDFLARE_ENV=local` so they find the `env.local` bindings in wrangler.jsonc. Run them from repo root — they're thin aliases for the cms-package scripts.
 
 ## 8. Smoke test
 
