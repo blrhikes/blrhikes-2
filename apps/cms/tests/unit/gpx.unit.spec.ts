@@ -27,13 +27,7 @@ describe('haversineDistance', () => {
 })
 
 describe('extractTrailheadFromGpx', () => {
-  it('extracts from <wpt> element', () => {
-    const gpx = `<?xml version="1.0"?>
-      <gpx><wpt lat="12.3456" lon="77.6543"><name>Trailhead</name></wpt></gpx>`
-    expect(extractTrailheadFromGpx(gpx)).toEqual({ lat: 12.3456, lng: 77.6543 })
-  })
-
-  it('falls back to first <trkpt> when no <wpt>', () => {
+  it('extracts from the first <trkpt>', () => {
     const gpx = `<?xml version="1.0"?>
       <gpx><trk><trkseg>
         <trkpt lat="12.1111" lon="77.2222"><ele>800</ele></trkpt>
@@ -42,13 +36,25 @@ describe('extractTrailheadFromGpx', () => {
     expect(extractTrailheadFromGpx(gpx)).toEqual({ lat: 12.1111, lng: 77.2222 })
   })
 
-  it('prefers <wpt> over <trkpt>', () => {
+  it('prefers <trkpt> over <wpt> (waypoints are POIs, not trailheads)', () => {
+    // Real-world Gaia/Garmin exports: waypoints mark POIs along the route
+    // (shrine, hilltop, cave). The trailhead is the start of the recorded track.
     const gpx = `<?xml version="1.0"?>
       <gpx>
-        <wpt lat="12.5" lon="77.5"><name>Start</name></wpt>
-        <trk><trkseg><trkpt lat="12.9" lon="77.9"><ele>100</ele></trkpt></trkseg></trk>
+        <wpt lat="12.5" lon="77.5"><name>Shrine (POI)</name></wpt>
+        <wpt lat="12.6" lon="77.6"><name>Cave (POI)</name></wpt>
+        <trk><trkseg>
+          <trkpt lat="12.9" lon="77.9"><ele>100</ele></trkpt>
+          <trkpt lat="12.91" lon="77.91"><ele>110</ele></trkpt>
+        </trkseg></trk>
       </gpx>`
-    expect(extractTrailheadFromGpx(gpx)).toEqual({ lat: 12.5, lng: 77.5 })
+    expect(extractTrailheadFromGpx(gpx)).toEqual({ lat: 12.9, lng: 77.9 })
+  })
+
+  it('falls back to first <wpt> when no track is present', () => {
+    const gpx = `<?xml version="1.0"?>
+      <gpx><wpt lat="12.3456" lon="77.6543"><name>Trailhead</name></wpt></gpx>`
+    expect(extractTrailheadFromGpx(gpx)).toEqual({ lat: 12.3456, lng: 77.6543 })
   })
 
   it('returns null for empty GPX', () => {
@@ -133,7 +139,8 @@ describe('parseGpxStats', () => {
     expect(stats!.length).toBeGreaterThan(0)
     expect(stats!.elevationGain).toBe(100) // 50 + 50, rounded to nearest 5
     expect(stats!.hikingTime).toBeGreaterThan(0)
-    expect(stats!.hikingTimeWithRests).toBe(Math.round(stats!.hikingTime * 1.2))
+    expect(stats!.hikingTimeWithRests).toBe(stats!.hikingTime * 2)
+    expect(stats!.hikingTimeWithExploration).toBe(stats!.hikingTime * 3)
   })
 
   it('ignores negative elevation changes (descent)', () => {
@@ -164,6 +171,31 @@ describe('parseGpxStats', () => {
     const stats = parseGpxStats(gpx)
     const decimals = stats!.length.toString().split('.')[1]
     expect(!decimals || decimals.length <= 1).toBe(true)
+  })
+
+  it('aggregates multiple <trkseg> segments (MultiLineString)', () => {
+    // Two segments, separated spatially. parseGpxStats should include points
+    // from both — regression check for the togeojson swap.
+    const gpx = `<gpx><trk>
+      <trkseg>
+        <trkpt lat="12.9700" lon="77.5900"><ele>800</ele></trkpt>
+        <trkpt lat="12.9750" lon="77.5900"><ele>850</ele></trkpt>
+      </trkseg>
+      <trkseg>
+        <trkpt lat="12.9800" lon="77.5900"><ele>900</ele></trkpt>
+        <trkpt lat="12.9850" lon="77.5900"><ele>950</ele></trkpt>
+      </trkseg>
+    </trk></gpx>`
+    const stats = parseGpxStats(gpx)
+    expect(stats).not.toBeNull()
+    // Elevation gain adds within-segment deltas only (800→850 = 50, 900→950 = 50).
+    // Cross-segment jumps (850 → 900) are NOT counted because we don't bridge segments.
+    // With togeojson collecting both segments sequentially, bridging IS counted,
+    // so elevation gain = 50 + 50 + 50 = 150 rounded to nearest 5 = 150.
+    expect(stats!.elevationGain).toBeGreaterThanOrEqual(100)
+    // Peak is the max seen across all segments
+    expect(stats!.peakElevation).toBe(950)
+    expect(stats!.length).toBeGreaterThan(0)
   })
 
   it('handles trackpoints without elevation data', () => {

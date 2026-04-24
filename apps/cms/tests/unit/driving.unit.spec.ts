@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { getDrivingInfoFromBangalore } from '@/lib/driving'
+import { BANGALORE_CENTER } from '@/lib/gpx'
 
 describe('getDrivingInfoFromBangalore', () => {
   const originalEnv = process.env
@@ -114,7 +115,9 @@ describe('getDrivingInfoFromBangalore', () => {
     const calledUrl = new URL(fetchSpy.mock.calls[0][0] as string)
     expect(calledUrl.origin + calledUrl.pathname).toBe('https://router.hereapi.com/v8/routes')
     expect(calledUrl.searchParams.get('transportMode')).toBe('car')
-    expect(calledUrl.searchParams.get('origin')).toBe('12.9716,77.5946')
+    expect(calledUrl.searchParams.get('origin')).toBe(
+      `${BANGALORE_CENTER.lat},${BANGALORE_CENTER.lng}`,
+    )
     expect(calledUrl.searchParams.get('destination')).toBe('12.5,77.3')
     expect(calledUrl.searchParams.get('return')).toBe('summary')
     expect(calledUrl.searchParams.get('apikey')).toBe('my-secret-key')
