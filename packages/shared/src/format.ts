@@ -1,3 +1,15 @@
+import type { Trail } from "./types.js";
+
+/**
+ * Display name for a trail: altName, with the gh-issue-number as fallback
+ * for trails missing an altName. Title is intentionally not shown.
+ */
+export function trailDisplayName(trail: Pick<Trail, "altName" | "githubIssueNumber">): string {
+  if (trail.altName) return trail.altName;
+  if (trail.githubIssueNumber != null) return `#${trail.githubIssueNumber}`;
+  return "";
+}
+
 /**
  * Round a minute count to whole hours, with a floor of 1 so very short
  * trails don't render as "0 hours".

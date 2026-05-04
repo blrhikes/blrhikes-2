@@ -233,3 +233,25 @@ export async function fetchTrailById(
   if (doc.status !== "live") return null;
   return normalizeTrail(doc, cmsUrl);
 }
+
+export async function fetchTrailByGithubIssueNumber(
+  cmsUrl: string,
+  githubIssueNumber: number,
+  payloadToken?: string,
+): Promise<NormalizedTrail | null> {
+  const qs = new URLSearchParams();
+  qs.set("where[githubIssueNumber][equals]", String(githubIssueNumber));
+  qs.set("where[status][equals]", "live");
+  qs.set("limit", "1");
+
+  const url = `${cmsUrl}/api/trails?${qs.toString()}`;
+  const res = await fetch(url, { headers: buildHeaders(payloadToken) });
+  if (!res.ok) {
+    throw new Error(`CMS API error: ${res.status}`);
+  }
+
+  const data = (await res.json()) as PayloadResponse<Record<string, unknown>>;
+  if (data.docs.length === 0) return null;
+
+  return normalizeTrail(data.docs[0], cmsUrl);
+}

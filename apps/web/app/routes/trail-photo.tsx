@@ -19,7 +19,7 @@ export default function TrailPhotoPage({ params }: Route.ComponentProps) {
         <div className="text-center">
           <p className="text-lg">Photo not found.</p>
           <Link
-            to={trail ? `/trails/${trail.slug}` : "/trails"}
+            to={trail ? `/trail/${trail.slug}` : "/trails"}
             className="mt-4 inline-block rounded-md bg-stone-100 px-4 py-2 text-stone-900"
           >
             Back
@@ -31,7 +31,7 @@ export default function TrailPhotoPage({ params }: Route.ComponentProps) {
 
   const prev = gallery[index - 1];
   const next = gallery[index + 1];
-  const backUrl = `/trails/${trail.slug}`;
+  const backUrl = `/trail/${trail.slug}`;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/97 backdrop-blur-sm">
@@ -64,7 +64,7 @@ export default function TrailPhotoPage({ params }: Route.ComponentProps) {
       <div className="flex items-center justify-between gap-2 px-4 pb-6 sm:px-8">
         {prev?.image?.id ? (
           <Link
-            to={`/trails/${trail.slug}/photo/${prev.image.id}`}
+            to={`/trail/${trail.slug}/photo/${prev.image.id}`}
             viewTransition
             replace
             className="rounded-md bg-stone-800/80 px-4 py-2 text-sm text-stone-100 transition hover:bg-stone-700"
@@ -76,7 +76,7 @@ export default function TrailPhotoPage({ params }: Route.ComponentProps) {
         )}
         {next?.image?.id ? (
           <Link
-            to={`/trails/${trail.slug}/photo/${next.image.id}`}
+            to={`/trail/${trail.slug}/photo/${next.image.id}`}
             viewTransition
             replace
             className="rounded-md bg-stone-800/80 px-4 py-2 text-sm text-stone-100 transition hover:bg-stone-700"

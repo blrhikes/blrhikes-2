@@ -56,7 +56,7 @@ export const Trails: CollectionConfig = {
   slug: 'trails',
   admin: {
     useAsTitle: 'title',
-    defaultColumns: ['title', 'area', 'difficulty', 'status'],
+    defaultColumns: ['title', 'altName', 'area', 'difficulty', 'status'],
   },
   access: {
     read: () => true,
@@ -409,21 +409,25 @@ export const Trails: CollectionConfig = {
     beforeValidate: [
       // Trail-level slug: auto-derive from altName (or title as fallback) so
       // editors never have to type it. Final canonical form is
-      // `<id>-<slugified-altName>` — the id prefix is stamped in afterChange
-      // on create, since `id` doesn't exist until after the row is inserted.
-      // Existing `<id>-...` slugs are preserved untouched (so editors can
+      // `<slugified-altName>-<num>` where num is githubIssueNumber when set,
+      // otherwise the Payload row id. The suffix is stamped in afterChange on
+      // create (since row id doesn't exist pre-insert).
+      // Existing `...-<digits>` slugs are preserved untouched (so editors can
       // rename altName without breaking URLs).
       ({ data, originalDoc }) => {
         if (!data) return data
         const currentSlug = data.slug?.trim?.()
-        const hasIdPrefix = currentSlug && /^\d+-/.test(currentSlug)
-        if (hasIdPrefix) return data
+        const hasNumericSuffix = currentSlug && /-\d+$/.test(currentSlug)
+        if (hasNumericSuffix) return data
 
-        const base = slugify(data.altName || data.title || '') || `trail-${originalDoc?.githubIssueNumber ?? 'new'}`
-        // If we already have a numeric id (update), bake it in right here;
-        // otherwise leave the bare slug and let afterChange finalize on create.
-        if (originalDoc?.id != null) {
-          data.slug = `${originalDoc.id}-${base}`
+        const ghNum = data.githubIssueNumber ?? originalDoc?.githubIssueNumber
+        const fallbackId = originalDoc?.id
+        const num = ghNum ?? fallbackId
+        const base = slugify(data.altName || data.title || '') || `trail-${num ?? 'new'}`
+        // If we already know a number (gh issue or existing row id), bake it
+        // in here; otherwise leave the bare slug and let afterChange finalize.
+        if (num != null) {
+          data.slug = `${base}-${num}`
         } else {
           data.slug = base
         }
@@ -451,15 +455,20 @@ export const Trails: CollectionConfig = {
       },
     ],
     afterChange: [
-      // Finalize the trail slug with the id prefix after create.
-      // We can't do this in beforeValidate because id doesn't exist pre-insert.
+      // Finalize the trail slug with the suffix after create.
+      // Prefer githubIssueNumber; fall back to Payload row id (which only
+      // exists post-insert, hence afterChange).
       async ({ doc, operation, req, previousDoc }) => {
         if (operation !== 'create') return doc
         const current = doc?.slug as string | undefined
         if (!current) return doc
-        if (/^\d+-/.test(current)) return doc // already canonicalized
+        if (/-\d+$/.test(current)) return doc // already canonicalized
 
-        const canonical = `${doc.id}-${current}`
+        const ghNum = doc?.githubIssueNumber as number | null | undefined
+        const num = ghNum ?? (doc?.id as number | string | undefined)
+        if (num == null) return doc // shouldn't happen post-insert, but guard anyway
+
+        const canonical = `${current}-${num}`
         try {
           await req.payload.update({
             collection: 'trails',
@@ -470,7 +479,7 @@ export const Trails: CollectionConfig = {
         } catch (err) {
           req.payload.logger.warn(
             { err, trailId: doc.id },
-            'Trail slug canonicalization (id prefix) failed',
+            'Trail slug canonicalization (numeric suffix) failed',
           )
         }
         void previousDoc

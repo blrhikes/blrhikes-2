@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { trailDisplayName } from "@blrhikes/shared";
 
 const difficultyBadge: Record<string, string> = {
   easy: "bg-stone-200 text-stone-700",
@@ -35,7 +36,7 @@ export function TrailCard({
   if (mode === "list") {
     return (
       <Link
-        to={`/trails/${trail.slug}`}
+        to={`/trail/${trail.slug}`}
         className="flex gap-4 items-center rounded-2xl border-2 border-stone-200 bg-stone-100 p-4 transition hover:border-accent"
       >
         {/* Image */}
@@ -43,7 +44,7 @@ export function TrailCard({
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt={trail.title}
+              alt={trailDisplayName(trail)}
               className="h-full w-full object-cover"
               loading="lazy"
             />
@@ -56,7 +57,7 @@ export function TrailCard({
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-bold text-stone-900">{trail.title}</h3>
+          <h3 className="text-lg font-bold text-stone-900">{trailDisplayName(trail)}</h3>
           {trail.area && (
             <p className="text-sm text-stone-500">
               {trail.area}
@@ -95,7 +96,7 @@ export function TrailCard({
   // Grid mode
   return (
     <Link
-      to={`/trails/${trail.slug}`}
+      to={`/trail/${trail.slug}`}
       className="group flex flex-col overflow-hidden rounded-2xl border-2 border-stone-200 bg-stone-100 transition-all duration-200 hover:border-accent hover:-translate-y-1"
     >
       {/* Image */}
@@ -103,7 +104,7 @@ export function TrailCard({
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={trail.title}
+            alt={trailDisplayName(trail)}
             className="h-full w-full object-cover transition group-hover:scale-105"
             loading="lazy"
           />
@@ -123,7 +124,7 @@ export function TrailCard({
         )}
 
         <h3 className="text-xl font-bold text-stone-900 leading-tight">
-          {trail.title}
+          {trailDisplayName(trail)}
         </h3>
 
         <p className="text-sm text-stone-500 mt-1">

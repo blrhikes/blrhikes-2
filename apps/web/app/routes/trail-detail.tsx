@@ -1,9 +1,10 @@
 import { Form, Link, Outlet, data, redirect, useViewTransitionState } from "react-router";
 import type { Route } from "./+types/trail-detail";
-import { fetchTrailById, fetchTrailBySlug } from "../lib/api.server";
+import { fetchTrailById, fetchTrailByGithubIssueNumber, fetchTrailBySlug } from "../lib/api.server";
 import {
   formatHikingTimeRange,
   roundToHours,
+  trailDisplayName,
   type AuthUser,
   type TrailSection,
   type TrailGalleryItem,
@@ -21,7 +22,7 @@ export function meta({ data: loaderData }: Route.MetaArgs) {
   if (!trail) {
     return [{ title: "Trail Not Found | BLR Hikes" }];
   }
-  const title = `${trail.title} | BLR Hikes`;
+  const title = `${trailDisplayName(trail)} | BLR Hikes`;
   const description = trail.area ? `Hiking trail in ${trail.area} near Bangalore` : "Hiking trail near Bangalore";
   return [
     { title },
@@ -33,17 +34,26 @@ export function meta({ data: loaderData }: Route.MetaArgs) {
 }
 
 // URL resolution:
-//   /trails/131                        → fetch by id=131, redirect to canonical slug
-//   /trails/131-glasswater-lake-hike   → fetch by id=131, verify slug matches
-//   /trails/glasswater-lake-hike       → legacy slug lookup, redirect to canonical
-// Canonical slug = `<id>-<altName-slug>` (Trails.ts afterChange keeps it current).
+//   /trail/glasswater-lake-332        → exact slug lookup (slug is unique)
+//   /trail/glasswater-lake-hike       → exact slug lookup (covers legacy `<id>-<altName>` shape too)
+//   /trail/332                        → bare-digit shortcut: try gh-issue-number=332, then Payload id=332
+// Canonical slug = `<altName-slug>-<num>` where num is githubIssueNumber when present,
+// otherwise Payload row id (Trails.ts hooks keep it current).
+// Anything-with-a-dash is treated as a slug first, since slug uniqueness eliminates ambiguity
+// between gh-issue and row-id namespaces colliding on the same trailing number.
+// Legacy plural `/trails/:slug` is handled by trails-redirect.tsx → 301 to /trail/:slug.
 export async function loader({ params, context }: Route.LoaderArgs) {
   const segment = params.slug;
-  const idMatch = segment.match(/^(\d+)(?:-.*)?$/);
+  const token = context.payloadToken ?? undefined;
+  const bareDigits = /^\d+$/.test(segment);
 
-  const trail = idMatch
-    ? await fetchTrailById(context.cmsUrl, Number(idMatch[1]), context.payloadToken ?? undefined)
-    : await fetchTrailBySlug(context.cmsUrl, segment, context.payloadToken ?? undefined);
+  let trail = bareDigits ? null : await fetchTrailBySlug(context.cmsUrl, segment, token);
+  if (!trail && bareDigits) {
+    const num = Number(segment);
+    trail =
+      (await fetchTrailByGithubIssueNumber(context.cmsUrl, num, token)) ??
+      (await fetchTrailById(context.cmsUrl, num, token));
+  }
 
   if (!trail) {
     throw data(null, { status: 404 });
@@ -52,7 +62,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   // Redirect any non-canonical URL (bare id, old slug, stale slug) to the
   // current canonical slug so links stay tidy and SEO is happy.
   if (trail.slug && trail.slug !== segment) {
-    throw redirect(`/trails/${trail.slug}`);
+    throw redirect(`/trail/${trail.slug}`);
   }
 
   return { trail, user: context.user, cmsUrl: context.cmsUrl };
@@ -234,7 +244,7 @@ function GalleryThumbnail({
 }) {
   const url = photo.image?.url;
   const mediaId = photo.image?.id;
-  const to = mediaId ? `/trails/${trailSlug}/photo/${mediaId}` : undefined;
+  const to = mediaId ? `/trail/${trailSlug}/photo/${mediaId}` : undefined;
   // useViewTransitionState returns true only while *this* link is the active
   // transition participant — applying the transition name conditionally
   // prevents collisions between multiple thumbnails and the detail image.
@@ -278,7 +288,7 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
       {/* Hero Section — full-bleed image with overlaid content */}
       <section className="relative -mt-0 h-[70vh] lg:h-[95vh]">
         {imageUrl ? (
-          <img src={imageUrl} alt={trail.title} className="h-full w-full object-cover object-top" />
+          <img src={imageUrl} alt={trailDisplayName(trail)} className="h-full w-full object-cover object-top" />
         ) : (
           <div className="h-full w-full bg-stone-300" />
         )}
@@ -317,8 +327,7 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
               >
                 ← Back to Trails
               </Link>
-              <h1 className="text-4xl font-bold text-white lg:text-5xl">{trail.title}</h1>
-              {trail.altName && <p className="mt-1 text-lg italic text-stone-300">{trail.altName}</p>}
+              <h1 className="text-4xl font-bold text-white lg:text-5xl">{trailDisplayName(trail)}</h1>
               {trail.area && (
                 <p className="mt-2 text-xl font-semibold text-white lg:text-3xl">{trail.area}</p>
               )}
@@ -470,7 +479,7 @@ export default function TrailDetailPage({ loaderData }: Route.ComponentProps) {
         )}
       </article>
       <BottomNav />
-      {/* Nested photo overlay (trails/:slug/photo/:photoId) */}
+      {/* Nested photo overlay (trail/:slug/photo/:photoId) */}
       <Outlet />
     </div>
   );

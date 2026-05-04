@@ -16,6 +16,54 @@ function gpxFilenameToSlug(filename: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+// Mirrors apps/cms/src/collections/Trails.ts slugify so a title can be
+// converted to the same shape that gpx filenames already use.
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
+
+// Fetch every trail (paginating) and build a map from slugified title → trail.
+async function buildTitleSlugMap(): Promise<
+  Map<string, { id: string; title: string; gpxFile?: unknown }>
+> {
+  const map = new Map<string, { id: string; title: string; gpxFile?: unknown }>();
+  const limit = 100;
+  let page = 1;
+  while (true) {
+    const res = await fetch(
+      `${CMS_URL}/api/trails?limit=${limit}&page=${page}&depth=0`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to fetch trails: ${res.status} ${await res.text()}`);
+    }
+    const data = (await res.json()) as {
+      docs: { id: string; title: string; gpxFile?: unknown }[];
+      totalPages: number;
+    };
+    for (const t of data.docs) {
+      const key = slugify(t.title || "");
+      if (!key) continue;
+      // First-write wins on collisions; warn so the operator can disambiguate.
+      if (map.has(key)) {
+        console.warn(`  Duplicate title-slug "${key}" → ids ${map.get(key)!.id} & ${t.id}`);
+        continue;
+      }
+      map.set(key, t);
+    }
+    if (page >= data.totalPages) break;
+    page++;
+  }
+  return map;
+}
+
 // --- Upload GPX file to CMS ---
 async function uploadGpx(filePath: string): Promise<string | undefined> {
   const fileBuffer = fs.readFileSync(filePath);
@@ -41,23 +89,6 @@ async function uploadGpx(filePath: string): Promise<string | undefined> {
 
   const data = (await res.json()) as { doc: { id: string } };
   return data.doc.id;
-}
-
-// --- Find trail by slug ---
-async function findTrailBySlug(
-  slug: string
-): Promise<{ id: string; title: string; gpxFile?: unknown } | undefined> {
-  const res = await fetch(
-    `${CMS_URL}/api/trails?where[slug][equals]=${encodeURIComponent(slug)}&limit=1`,
-    { headers: authHeaders() }
-  );
-  if (!res.ok) return undefined;
-
-  const data = (await res.json()) as {
-    docs: { id: string; title: string; gpxFile?: unknown }[];
-    totalDocs: number;
-  };
-  return data.totalDocs > 0 ? data.docs[0] : undefined;
 }
 
 // --- Patch trail with GPX file ID ---
@@ -91,6 +122,10 @@ async function main() {
 
   console.log(`Found ${gpxFiles.length} GPX files\n`);
 
+  console.log(`Building title-slug → trail map…`);
+  const titleSlugMap = await buildTitleSlugMap();
+  console.log(`Indexed ${titleSlugMap.size} trails by title-slug\n`);
+
   let matched = 0;
   let skipped = 0;
   let uploaded = 0;
@@ -103,7 +138,7 @@ async function main() {
     console.log(`${gpxFile} → slug: "${slug}"`);
 
     const gpxPath = path.join(GPX_DIR, gpxFile);
-    const trail = await findTrailBySlug(slug);
+    const trail = titleSlugMap.get(slug);
 
     if (!trail) {
       console.log(`  No matching trail — uploading to GPX collection only`);

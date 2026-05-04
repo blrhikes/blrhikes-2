@@ -5,6 +5,7 @@ export interface Trail {
   title: string;
   slug: string;
   altName?: string;
+  githubIssueNumber?: number;
 
   // Media
   coverImage?: MediaItem;

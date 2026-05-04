@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import matter from "gray-matter";
 import type { Route } from "./+types/design";
 import { TrailCard } from "../components/trail-card";
+import { trailDisplayName } from "@blrhikes/shared";
 import githubData from "../../../../scripts/.cache/github-data.json";
 
 const CDN_BASE =
@@ -121,7 +122,7 @@ function TrailTable({ trails }: { trails: any[] }) {
           {trails.map((trail: any) => (
             <tr key={trail.id} className="border-b border-stone-200 hover:bg-accent/5 transition">
               <td className="px-4 py-3">
-                <span className="font-bold font-serif">{trail.title}</span>
+                <span className="font-bold font-serif">{trailDisplayName(trail)}</span>
               </td>
               <td className="px-4 py-3 text-stone-500">{trail.area || "—"}</td>
               <td className="px-4 py-3">{trail.difficulty && <DifficultyBadge difficulty={trail.difficulty} />}</td>
