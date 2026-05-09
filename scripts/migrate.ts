@@ -21,6 +21,7 @@ const REFRESH = process.argv.includes("--refresh");
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = join(__dirname, ".cache");
 const CACHE_FILE = join(CACHE_DIR, "github-data.json");
+const SOURCE_DIR = join(CACHE_DIR, "source");
 
 const CDN_BASE =
   "https://blrhikes.com/cdn-cgi/image/width=800,quality=80,format=jpeg/https://images.blrhikes.com";
@@ -413,6 +414,31 @@ function writeCache(data: CachedGitHubData): void {
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
 }
 
+function writeIssueMarkdownFiles(data: CachedGitHubData): void {
+  mkdirSync(SOURCE_DIR, { recursive: true });
+  for (const issue of data.issues) {
+    const comments = data.comments[issue.number] || [];
+    const parts: string[] = [];
+    parts.push(`# #${issue.number} — ${issue.title}\n`);
+    parts.push("<!-- ===== ISSUE BODY ===== -->\n");
+    parts.push((issue.body || "").trim() || "_(no body)_");
+
+    if (comments.length > 0) {
+      parts.push("\n<!-- ===== COMMENTS ===== -->");
+      comments.forEach((comment, idx) => {
+        parts.push(
+          `\n<!-- --- Comment ${idx + 1} of ${comments.length} (id: ${comment.id}) --- -->\n`,
+        );
+        parts.push((comment.body || "").trim() || "_(empty comment)_");
+      });
+    }
+
+    const filePath = join(SOURCE_DIR, `${issue.number}.md`);
+    writeFileSync(filePath, parts.join("\n") + "\n");
+  }
+  console.log(`Wrote ${data.issues.length} issue .md file(s) to ${SOURCE_DIR}`);
+}
+
 async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
   if (!REFRESH) {
     const cached = readCache();
@@ -420,6 +446,7 @@ async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
       console.log(`Using cached GitHub data from ${cached.fetchedAt}`);
       console.log(`  ${cached.issues.length} issues, ${Object.keys(cached.comments).length} comment threads`);
       console.log(`  (use --refresh to re-fetch from GitHub)`);
+      writeIssueMarkdownFiles(cached);
       return cached;
     }
   }
@@ -446,6 +473,7 @@ async function loadOrFetchGitHubData(): Promise<CachedGitHubData> {
 
   writeCache(data);
   console.log(`Cached GitHub data to ${CACHE_FILE}`);
+  writeIssueMarkdownFiles(data);
   return data;
 }
 

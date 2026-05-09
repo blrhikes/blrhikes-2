@@ -81,11 +81,20 @@ git config core.hooksPath .githooks
 
 ### Scripts package (`scripts/`)
 
-| Script                                    | Notes |
-|-------------------------------------------|-------|
-| `pnpm --filter scripts seed:sections`     | Port issue bodies + comments → structured sections (dry-run by default) |
-| `pnpm --filter scripts seed:sections -- --commit`  | Actually write |
-| `pnpm --filter scripts seed:sections -- --refresh` | Refresh GitHub issue cache (no CMS writes) |
+Run from the repo root:
+
+| Short                | Equivalent                                                    | Notes |
+|----------------------|---------------------------------------------------------------|-------|
+| `pnpm pull`          | `pnpm --filter scripts seed:sections -- --refresh`            | **Refresh GitHub cache only** — no CMS writes, exits after fetch. Safe to run anytime |
+| `pnpm seed`          | `pnpm --filter scripts seed`                                  | Port trails → CMS. Reads from cache if present |
+| `pnpm seed:refresh`  | `pnpm --filter scripts seed -- --refresh`                     | Re-fetch from GitHub **then** port trails to CMS |
+| `pnpm seed:gpx`      | `pnpm --filter scripts seed:gpx`                              | Upload GPX files to CMS |
+| `pnpm sections`      | `pnpm --filter scripts seed:sections`                         | Port issue bodies + comments → sections (**dry-run**) |
+| `pnpm sections:write`| `pnpm --filter scripts seed:sections -- --commit`             | Port sections — actually writes |
+
+Pass-through flags still work: `pnpm seed -- --force` etc.
+
+> **GitHub cache lives at** `scripts/.cache/github-data.json` (raw JSON) **and** `scripts/.cache/source/<issue#>.md` (one markdown file per issue, body + comments). Both regenerate together whenever data is fetched (`pnpm pull` or `pnpm seed:refresh`).
 
 ## Architecture
 

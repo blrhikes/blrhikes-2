@@ -25,6 +25,7 @@ const CDN_BASE =
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = join(__dirname, ".cache");
 const CACHE_FILE = join(CACHE_DIR, "github-data.json");
+const SOURCE_DIR = join(CACHE_DIR, "source");
 
 // ---------------------------------------------------------------------------
 // Types (mirror the shapes we care about — don't pull Payload types here to
@@ -238,7 +239,33 @@ async function refreshGitHubCache(): Promise<CachedGitHubData> {
   mkdirSync(CACHE_DIR, { recursive: true });
   writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2));
   console.log(`  wrote ${CACHE_FILE}`);
+  writeIssueMarkdownFiles(data);
   return data;
+}
+
+function writeIssueMarkdownFiles(data: CachedGitHubData): void {
+  mkdirSync(SOURCE_DIR, { recursive: true });
+  for (const issue of data.issues) {
+    const comments = data.comments[issue.number] || [];
+    const parts: string[] = [];
+    parts.push(`# #${issue.number} — ${issue.title}\n`);
+    parts.push("<!-- ===== ISSUE BODY ===== -->\n");
+    parts.push((issue.body || "").trim() || "_(no body)_");
+
+    if (comments.length > 0) {
+      parts.push("\n<!-- ===== COMMENTS ===== -->");
+      comments.forEach((comment, idx) => {
+        parts.push(
+          `\n<!-- --- Comment ${idx + 1} of ${comments.length} (id: ${comment.id}) --- -->\n`,
+        );
+        parts.push((comment.body || "").trim() || "_(empty comment)_");
+      });
+    }
+
+    const filePath = join(SOURCE_DIR, `${issue.number}.md`);
+    writeFileSync(filePath, parts.join("\n") + "\n");
+  }
+  console.log(`  wrote ${data.issues.length} issue .md file(s) to ${SOURCE_DIR}`);
 }
 
 async function loadGitHubCache(): Promise<CachedGitHubData> {
@@ -252,6 +279,7 @@ async function loadGitHubCache(): Promise<CachedGitHubData> {
   console.log(
     `Loaded cached GitHub data from ${data.fetchedAt} (${data.issues.length} issues). Use --refresh to re-fetch.`,
   );
+  writeIssueMarkdownFiles(data);
   return data;
 }
 

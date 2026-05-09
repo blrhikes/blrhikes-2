@@ -8,8 +8,12 @@
     "build:web": "pnpm --filter @blrhikes/web build",
     "migrate": "pnpm --filter cms migrate",
     "migrate:create": "pnpm --filter cms migrate:create",
+    "pull": "pnpm --filter @blrhikes/scripts seed:sections -- --refresh",
     "seed": "pnpm --filter @blrhikes/scripts seed",
-    "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx"
+    "seed:refresh": "pnpm --filter @blrhikes/scripts seed -- --refresh",
+    "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx",
+    "sections": "pnpm --filter @blrhikes/scripts seed:sections",
+    "sections:write": "pnpm --filter @blrhikes/scripts seed:sections -- --commit"
   },
   "engines": {
     "node": ">=22"
