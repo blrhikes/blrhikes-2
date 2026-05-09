@@ -44,6 +44,37 @@
         },
       ],
     },
+    // Remote dev sandbox. Deploys with `--env=dev`. cms-dev.blrhikes.in.
+    // Same shape as test/live — separate worker, D1, R2, domain. Use this for
+    // experiments that need real CF infra without touching test or live data.
+    "dev": {
+      "name": "blrhikes-cms-dev",
+      "services": [],
+      "routes": [{ "pattern": "cms-dev.blrhikes.in", "custom_domain": true }],
+      "vars": {
+        "WEB_URL": "https://dev.blrhikes.in",
+        "CMS_URL": "https://cms-dev.blrhikes.in",
+      },
+      "d1_databases": [
+        {
+          "binding": "D1",
+          "database_name": "blrhikes-dev",
+          "database_id": "6129cc3e-3c56-4937-9fc7-cfc0960214b7",
+          "remote": true,
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2",
+          "bucket_name": "blrhikes-dev",
+          "preview_bucket_name": "blrhikes-dev",
+          "remote": true,
+        },
+      ],
+      "observability": {
+        "enabled": true,
+      },
+    },
     // Remote pre-prod. Deploys with `--env=test`. cms-test.blrhikes.in.
     "test": {
       "name": "blrhikes-cms-test",

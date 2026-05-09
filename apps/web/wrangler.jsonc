@@ -12,6 +12,14 @@
   // `react-router dev` (Vite) and does not go through wrangler — CMS URL
   // for dev is set via .dev.vars / .env, not here.
   "env": {
+    // Remote dev sandbox. dev.blrhikes.in. Points at cms-dev for its loader fetches.
+    "dev": {
+      "name": "blrhikes-web-dev",
+      "vars": {
+        "CMS_URL": "https://cms-dev.blrhikes.in",
+      },
+      "routes": [{ "pattern": "dev.blrhikes.in", "custom_domain": true }],
+    },
     // Remote pre-prod. test.blrhikes.in.
     "test": {
       "name": "blrhikes-web-test",

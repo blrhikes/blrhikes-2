@@ -2,19 +2,22 @@
 
 This is a step-by-step for bootstrapping both apps (`apps/cms`, `apps/web`) on Cloudflare Workers via the **dashboard's GitHub integration**. After this is done, pushing to `main` auto-deploys via the CI workflow that Cloudflare sets up inside your repo.
 
-Two apps, two environments each:
+Two apps, three remote environments each (`dev` is a sandbox tier sitting below `test`):
 
 | App           | Env    | Worker name            | Domain                         |
 |---------------|--------|------------------------|--------------------------------|
+| `apps/cms`    | dev    | `blrhikes-cms-dev`     | `cms-dev.blrhikes.in`          |
 | `apps/cms`    | test   | `blrhikes-cms-test`    | `cms-test.blrhikes.in`         |
 | `apps/cms`    | live   | `blrhikes-cms-live`    | `cms.blrhikes.in`              |
+| `apps/web`    | dev    | `blrhikes-web-dev`     | `dev.blrhikes.in`              |
 | `apps/web`    | test   | `blrhikes-web-test`    | `test.blrhikes.in`             |
 | `apps/web`    | live   | `blrhikes-web-live`    | `blrhikes.in`                  |
 
-The CMS also needs a D1 database and an R2 bucket **per environment** — 4 total:
+The CMS also needs a D1 database and an R2 bucket **per environment** — 6 total:
 
 | Env    | D1 database name    | R2 bucket name      |
 |--------|---------------------|---------------------|
+| dev    | `blrhikes-dev`      | `blrhikes-dev`      |
 | test   | `blrhikes-test`     | `blrhikes-test`     |
 | live   | `blrhikes-live`     | `blrhikes-live`     |
 
@@ -24,7 +27,7 @@ The CMS also needs a D1 database and an R2 bucket **per environment** — 4 tota
 
 ## 0. Before you start
 
-- Make sure `blrhikes.in` is added as a zone in the same Cloudflare account you'll be deploying to. The custom domains in wrangler.jsonc (`blrhikes.in`, `cms.blrhikes.in`, `test.blrhikes.in`, `cms-test.blrhikes.in`) will be attached to the Workers as Custom Domains — no separate DNS record needed, the dashboard wires A/AAAA for you.
+- Make sure `blrhikes.in` is added as a zone in the same Cloudflare account you'll be deploying to. The custom domains in wrangler.jsonc (`blrhikes.in`, `cms.blrhikes.in`, `test.blrhikes.in`, `cms-test.blrhikes.in`, `dev.blrhikes.in`, `cms-dev.blrhikes.in`) will be attached to the Workers as Custom Domains — no separate DNS record needed, the dashboard wires A/AAAA for you.
 - You'll need your **Account ID**. Grab it from the right sidebar of the CF dashboard home (or `Workers & Pages → Overview`).
 - The repo must be pushed to GitHub under an account/org CF can access.
 
@@ -55,6 +58,7 @@ All `wrangler` commands below are run via the cms package so they use the same p
 
 ```bash
 # Create — APAC location hint routes the primary replica to the closest region (BOM).
+pnpm --filter cms exec wrangler d1 create blrhikes-dev --location=apac
 pnpm --filter cms exec wrangler d1 create blrhikes-test --location=apac
 pnpm --filter cms exec wrangler d1 create blrhikes-live --location=apac
 ```
@@ -73,6 +77,7 @@ database_id = "97df08dc-07ad-4bfb-a89e-fd1156758e68"
 
 Copy the `database_id` values and paste them into `apps/cms/wrangler.jsonc`:
 
+- `env.dev.d1_databases[0].database_id` ← id from `blrhikes-dev`
 - `env.test.d1_databases[0].database_id` ← id from `blrhikes-test`
 - `env.live.d1_databases[0].database_id` ← id from `blrhikes-live`
 
@@ -89,7 +94,7 @@ pnpm --filter cms exec wrangler d1 list
 2. Name: `blrhikes-test`, location: closest to Bangalore (BOM is a good default).
 3. Copy the **Database ID** from the DB detail page.
 4. Paste into `apps/cms/wrangler.jsonc` → `env.test.d1_databases[0].database_id`.
-5. Repeat for `blrhikes-live`.
+5. Repeat for `blrhikes-dev` and `blrhikes-live`.
 </details>
 
 ### R2 (both envs)
@@ -97,6 +102,7 @@ pnpm --filter cms exec wrangler d1 list
 ```bash
 # Create. --location=apac is a hint, not a guarantee — CF picks the nearest
 # cluster in the hinted region. Safe to omit if you don't care.
+pnpm --filter cms exec wrangler r2 bucket create blrhikes-dev --location=apac
 pnpm --filter cms exec wrangler r2 bucket create blrhikes-test --location=apac
 pnpm --filter cms exec wrangler r2 bucket create blrhikes-live --location=apac
 ```
@@ -115,19 +121,20 @@ pnpm --filter cms exec wrangler r2 bucket list
 1. **R2 → Create bucket**
 2. Name: `blrhikes-test`, location hint: APAC/BOM.
 3. Public access: **disabled** (CMS serves files through the worker's R2 binding).
-4. Repeat for `blrhikes-live`.
+4. Repeat for `blrhikes-dev` and `blrhikes-live`.
 </details>
 
 Commit the wrangler.jsonc updates (D1 ids are the only real change).
 
-## 3. Create the 4 Workers via GitHub integration
+## 3. Create the 6 Workers via GitHub integration
 
-Do this four times — once per entry in the table at the top.
+Do this six times — once per entry in the table at the top.
 
 1. **Workers & Pages → Create → Workers → Connect to Git**
 2. Select your GitHub account, pick the `blrhikes-2` repo, and authorize CF to access it (first time only).
 3. **Project name**: use the worker name from the table (e.g. `blrhikes-cms-test`). This must match the `name` in the wrangler env block.
 4. **Production branch**:
+   - `dev` workers → track whatever feature branch you want a remote sandbox of (commonly the same branch you actively push to)
    - `test` workers → track a branch like `main` or `backend-v1` (whichever you want to auto-deploy to test from)
    - `live` workers → track `main` (or a `production` tag/branch)
 5. **Build command** (per app):
@@ -135,8 +142,8 @@ Do this four times — once per entry in the table at the top.
    - Web: `pnpm install --frozen-lockfile && pnpm --filter web build`
 6. **Build output directory**: leave as default — wrangler handles it based on `main` in the jsonc.
 7. **Root directory**: `apps/cms` or `apps/web` respectively.
-8. **Wrangler env flag**: under `Settings → Builds`, set the deploy command to `wrangler deploy --env=test` (or `--env=live`). This tells Cloudflare which env block in wrangler.jsonc to use.
-9. **Build-time env var (CMS only)**: under `Settings → Builds → Variables`, set `CLOUDFLARE_ENV=test` on the test worker and `CLOUDFLARE_ENV=live` on the live one. `build:cf` forwards this to `opennextjs-cloudflare build --env=$CLOUDFLARE_ENV` so OpenNext picks up the right env block from wrangler.jsonc.
+8. **Wrangler env flag**: under `Settings → Builds`, set the deploy command to `wrangler deploy --env=dev` (or `--env=test` / `--env=live`). This tells Cloudflare which env block in wrangler.jsonc to use.
+9. **Build-time env var (CMS only)**: under `Settings → Builds → Variables`, set `CLOUDFLARE_ENV=dev` / `test` / `live` to match the worker. `build:cf` forwards this to `opennextjs-cloudflare build --env=$CLOUDFLARE_ENV` so OpenNext picks up the right env block from wrangler.jsonc.
 10. **Create & Deploy**. First deploy will likely fail until you set secrets (next step) — that's fine.
 
 > **Why `build:cf` and not `build`?** `pnpm --filter cms build` runs `migrate:prod && next build`. The migrate step would try to hit D1 at CF's build-container level (no bindings available there) and fail. `build:cf` is the CF-dashboard-friendly variant: it only runs `opennextjs-cloudflare build`, which packages `.open-next/worker.js`. DB migrations happen separately via `deploy:database` against the deployed worker's bindings (§7).
@@ -147,7 +154,7 @@ The CMS needs two required secrets and a couple of optional ones. Set them per e
 
 Each CMS worker → **Settings → Variables and Secrets → Add (type: Secret)**:
 
-- **`PAYLOAD_SECRET`** — random 64-char string from `openssl rand -hex 32`. **Use different secrets for test vs live.** Payload signs JWTs with it; rotating invalidates every active session.
+- **`PAYLOAD_SECRET`** — random 64-char string from `openssl rand -hex 32`. **Use different secrets per env (dev / test / live).** Payload signs JWTs with it; rotating invalidates every active session.
 - **`RESEND_API_KEY`** — from the Resend dashboard. Used for forgot-password and other outbound emails via the adapter at `apps/cms/src/email/resend.ts`.
   - **Before sends work**, verify the sending domain in Resend (default: `send.blrhikes.in`). Add the SPF + DKIM records Resend prescribes to the `blrhikes.in` DNS zone. Without verification, Resend returns 403.
   - Optionally override the default from address/name with `RESEND_FROM` / `RESEND_FROM_NAME` secrets.
@@ -173,8 +180,8 @@ Bindings (D1, R2, KV, Service Bindings) are a fourth thing — declared in `wran
 
 | Variable | Phase | Type | Where set | Required? |
 |----------|-------|------|-----------|-----------|
-| `CLOUDFLARE_ENV` | build | build-env | Dashboard → `Settings → Builds → Variables` — set to `test` or `live` per worker | Yes |
-| `WEB_URL` | runtime | plain var | `env.test/live.vars` in `apps/cms/wrangler.jsonc` | Yes |
+| `CLOUDFLARE_ENV` | build | build-env | Dashboard → `Settings → Builds → Variables` — set to `dev`, `test`, or `live` per worker | Yes |
+| `WEB_URL` | runtime | plain var | `env.dev/test/live.vars` in `apps/cms/wrangler.jsonc` | Yes |
 | `CMS_URL` | runtime | plain var | same | Yes |
 | `PAYLOAD_SECRET` | runtime | secret | Dashboard → `Variables and Secrets` (different value per env) | Yes |
 | `RESEND_API_KEY` | runtime | secret | Dashboard → `Variables and Secrets` | Yes (for forgot-password + outbound email) |
@@ -189,7 +196,7 @@ Bindings (D1, R2, KV, Service Bindings) are a fourth thing — declared in `wran
 | Variable | Phase | Type | Where set | Required? |
 |----------|-------|------|-----------|-----------|
 | *(none)* | build | — | — | The web build is pure Vite — no build-time env vars needed |
-| `CMS_URL` | runtime | plain var | `env.test/live.vars` in `apps/web/wrangler.jsonc` | Yes |
+| `CMS_URL` | runtime | plain var | `env.dev/test/live.vars` in `apps/web/wrangler.jsonc` | Yes |
 
 #### Common gotcha
 
@@ -201,7 +208,7 @@ Bindings are declared in `apps/cms/wrangler.jsonc` per env — CF will pick them
 
 For each CMS worker → **Settings → Bindings** after the first successful deploy:
 
-- Confirm `D1` binding points at the right DB (`blrhikes-test` or `blrhikes-live`).
+- Confirm `D1` binding points at the right DB (`blrhikes-dev`, `blrhikes-test`, or `blrhikes-live`).
 - Confirm `R2` binding points at the right bucket.
 
 If anything's missing, the fix is usually to edit wrangler.jsonc and push again.
@@ -212,8 +219,10 @@ The wrangler.jsonc `routes` block with `"custom_domain": true` tells CF to add t
 
 Each worker → **Settings → Domains & Routes → Add Custom Domain**:
 
+- `blrhikes-cms-dev` → `cms-dev.blrhikes.in`
 - `blrhikes-cms-test` → `cms-test.blrhikes.in`
 - `blrhikes-cms-live` → `cms.blrhikes.in`
+- `blrhikes-web-dev` → `dev.blrhikes.in`
 - `blrhikes-web-test` → `test.blrhikes.in`
 - `blrhikes-web-live` → `blrhikes.in`
 
@@ -229,7 +238,7 @@ cd apps/cms
 CLOUDFLARE_ENV=test pnpm deploy:database
 ```
 
-This runs `payload migrate` against the remote D1 via the bindings in wrangler.jsonc, then a `PRAGMA optimize` to keep SQLite happy. Run again with `CLOUDFLARE_ENV=live` after the live worker is up.
+This runs `payload migrate` against the remote D1 via the bindings in wrangler.jsonc, then a `PRAGMA optimize` to keep SQLite happy. Repeat with `CLOUDFLARE_ENV=dev` and `CLOUDFLARE_ENV=live` for the other envs once those workers are up.
 
 Wrangler uses your local CF auth (`wrangler login` once) — the GitHub integration deploys worker code but does not touch the DB.
 
@@ -248,7 +257,7 @@ Hit each domain:
 - `https://cms-test.blrhikes.in/api/users/me` → should return `{"user":null,"message":"Account"}`.
 - `https://test.blrhikes.in` → should render the web app, loader fetching from `cms-test.blrhikes.in`.
 
-Once both test domains are healthy, repeat for `live`.
+Once both test domains are healthy, repeat for `dev` (`cms-dev.blrhikes.in` / `dev.blrhikes.in`) and `live`.
 
 ## 9. Seed the test CMS (optional)
 
