@@ -11,4 +11,9 @@ export default [
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
   route("design", "routes/design.tsx"),
+  route("mockups", "routes/mockups.tsx"),
+  route("mockups/transport", "routes/mockups.transport.tsx"),
+  route("mockups/transport/plan", "routes/mockups.transport.plan.tsx"),
+  route("mockups/transport/me", "routes/mockups.transport.me.tsx"),
+  route("mockups/transport/form", "routes/mockups.transport.form.tsx"),
 ] satisfies RouteConfig;
