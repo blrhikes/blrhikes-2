@@ -13,7 +13,10 @@
     "seed:refresh": "pnpm --filter @blrhikes/scripts seed -- --refresh",
     "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx",
     "sections": "pnpm --filter @blrhikes/scripts seed:sections",
-    "sections:write": "pnpm --filter @blrhikes/scripts seed:sections -- --commit"
+    "sections:write": "pnpm --filter @blrhikes/scripts seed:sections -- --commit",
+    "cf:whoami": "set -a && . ./.env && set +a && curl -sS -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" https://api.cloudflare.com/client/v4/user/tokens/verify | jq",
+    "cf:workers": "set -a && . ./.env && set +a && curl -sS -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" \"https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts\" | jq '.result | sort_by(.modified_on) | reverse | .[] | {name: .id, modified_on}'",
+    "cf:workers:raw": "set -a && . ./.env && set +a && curl -sS -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" \"https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts\" | jq"
   },
   "engines": {
     "node": ">=22"
