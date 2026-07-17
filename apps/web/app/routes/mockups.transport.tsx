@@ -321,16 +321,16 @@ export default function TransportPlannerMock() {
   const planHeaderLines = (): string[] => {
     const out: string[] = [];
     const dest = db.plan.destination;
-    const destLine = [dest.label, dest.mapsUrl].filter(Boolean).join(" - ");
-    if (destLine) {
-      out.push(`*Trailhead:* ${destLine}${dest.time ? ` (reach by ${to12h(dest.time)})` : ""}`);
+    if (dest.label.trim() || dest.mapsUrl.trim()) {
+      const destBody = [dest.label ? `*${dest.label}*` : "", dest.mapsUrl].filter(Boolean).join(" - ");
+      out.push(`*Trailhead:* ${destBody}${dest.time ? ` (reach by ${to12h(dest.time)})` : ""}`);
       if (dest.notes) out.push(dest.notes);
       out.push("");
     }
     if (db.plan.stops.length) {
       out.push("Stops along the way:");
       db.plan.stops.forEach((s) =>
-        out.push(`${s.label}${s.time ? ` - ${to12h(s.time)}` : ""}${s.mapsUrl ? ` - ${s.mapsUrl}` : ""}`),
+        out.push([s.label ? `*${s.label}*` : "", s.time ? to12h(s.time) : "", s.mapsUrl].filter(Boolean).join(" - ")),
       );
       out.push("");
     }
