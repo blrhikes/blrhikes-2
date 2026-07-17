@@ -12,6 +12,7 @@ import {
   getDrivingInfoFromBangalore,
   getShortestRoadDistanceFromBangalore,
 } from '../lib/driving'
+import { buildComputedFrontmatter } from '../lib/computed-frontmatter'
 
 // Shared gating predicate: can this user read gated content for this trail?
 // Covers admin/contributor, lifetime members, non-expired yearly members,
@@ -265,6 +266,42 @@ export const Trails: CollectionConfig = {
           name: 'hikingTimeWithExploration',
           type: 'number',
           admin: { description: 'Hiking time with rests + exploration (3x base)', readOnly: true },
+        },
+        // Raw (unrounded) HERE values, captured so the legacy computed*
+        // frontmatter can report full precision (drivingDistance/drivingTime
+        // above are rounded for display and lose it).
+        {
+          name: 'computedDrivingDistance',
+          type: 'number',
+          admin: {
+            description: 'Raw driving distance in km (unrounded) — backs the legacy frontmatter',
+            readOnly: true,
+          },
+        },
+        {
+          name: 'computedDrivingTime',
+          type: 'number',
+          admin: {
+            description: 'Raw driving time in seconds — backs the legacy frontmatter',
+            readOnly: true,
+          },
+        },
+        // Compatibility output for the legacy blrhikes-webhook-listeners app
+        // (still in production). Virtual — recomputed on every read from the
+        // fields above; copy-paste this block into the legacy system.
+        {
+          name: 'computedFrontmatter',
+          type: 'textarea',
+          virtual: true,
+          admin: {
+            description:
+              'Legacy computed* frontmatter (compat with blrhikes-webhook-listeners). Read-only; recomputed on read.',
+            readOnly: true,
+            rows: 14,
+          },
+          hooks: {
+            afterRead: [({ data }) => (data ? buildComputedFrontmatter(data) : null)],
+          },
         },
       ],
     },
@@ -537,6 +574,8 @@ export const Trails: CollectionConfig = {
           'drivingDistanceText',
           'drivingTime',
           'drivingTimeText',
+          'computedDrivingDistance',
+          'computedDrivingTime',
           'relativeLocation',
         ] as const
         const hasMissingDerived = derivedKeys.some((k) => {
@@ -610,7 +649,9 @@ export const Trails: CollectionConfig = {
             shouldWrite('drivingDistance') ||
             shouldWrite('drivingTime') ||
             shouldWrite('drivingDistanceText') ||
-            shouldWrite('drivingTimeText')
+            shouldWrite('drivingTimeText') ||
+            shouldWrite('computedDrivingDistance') ||
+            shouldWrite('computedDrivingTime')
           if (needsFastRoute) {
             try {
               const driving = await getDrivingInfoFromBangalore(trailhead)
@@ -620,6 +661,10 @@ export const Trails: CollectionConfig = {
                   data.drivingDistanceText = driving.drivingDistanceText
                 if (shouldWrite('drivingTime')) data.drivingTime = driving.drivingTime
                 if (shouldWrite('drivingTimeText')) data.drivingTimeText = driving.drivingTimeText
+                if (shouldWrite('computedDrivingDistance'))
+                  data.computedDrivingDistance = driving.rawDistanceKm
+                if (shouldWrite('computedDrivingTime'))
+                  data.computedDrivingTime = driving.rawDurationSec
               }
             } catch (err) {
               req.payload.logger.error({ err }, 'HERE Routing API (fast) call failed')

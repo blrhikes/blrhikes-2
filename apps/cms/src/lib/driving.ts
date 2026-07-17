@@ -27,6 +27,10 @@ export interface DrivingInfo {
   drivingTime: number
   /** Human-readable duration, e.g. "1h 45min" */
   drivingTimeText: string
+  /** Raw distance in km, unrounded — for the legacy computed* frontmatter */
+  rawDistanceKm: number
+  /** Raw duration in seconds — for the legacy computed* frontmatter */
+  rawDurationSec: number
 }
 
 function formatDuration(minutes: number): string {
@@ -77,14 +81,18 @@ export async function getDrivingInfoFromBangalore(trailhead: {
   const summary = await fetchRouteSummary(trailhead, 'fast')
   if (!summary) return null
 
-  const drivingDistance = Math.round((summary.length / 1000) * 10) / 10 // metres → km, 1dp
-  const drivingTime = Math.round(summary.duration / 60) // seconds → minutes
+  const rawDistanceKm = summary.length / 1000 // metres → km, unrounded
+  const rawDurationSec = summary.duration // seconds
+  const drivingDistance = Math.round(rawDistanceKm * 10) / 10 // 1dp
+  const drivingTime = Math.round(rawDurationSec / 60) // seconds → minutes
 
   return {
     drivingDistance,
     drivingDistanceText: `${drivingDistance} km`,
     drivingTime,
     drivingTimeText: formatDuration(drivingTime),
+    rawDistanceKm,
+    rawDurationSec,
   }
 }
 
