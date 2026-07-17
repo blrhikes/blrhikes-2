@@ -9,6 +9,7 @@
     "migrate": "pnpm --filter cms migrate",
     "migrate:create": "pnpm --filter cms migrate:create",
     "pull": "pnpm --filter @blrhikes/scripts seed:sections -- --refresh",
+    "p": "pnpm run pull",
     "seed": "pnpm --filter @blrhikes/scripts seed",
     "seed:refresh": "pnpm --filter @blrhikes/scripts seed -- --refresh",
     "seed:gpx": "pnpm --filter @blrhikes/scripts seed:gpx",
